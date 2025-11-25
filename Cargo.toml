@@ -1,0 +1,38 @@
+[package]
+name = "shellshot"
+authors = ["lhenry-dev <lhenry.dev1@gmail.com>"]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85.1"
+description = "Transform your command-line output into clean, shareable images with a single command."
+license = "MIT/Apache-2.0"
+keywords = ["terminal", "screenshot", "cli", "ansi", "command"]
+categories = ["command-line-utilities"]
+readme = "README.md"
+repository = "https://github.com/lhenry-dev/shellshot"
+documentation = "https://docs.rs/shellshot/latest/shellshot/"
+homepage = "https://crates.io/crates/shellshot"
+
+[lib]
+name = "shellshot"
+path = "src/lib.rs"
+
+[[bin]]
+name = "shellshot"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5.51", features = ["derive"] }
+image = "0.25.8"
+imageproc = "0.25.0"
+ansi-parser = "0.9.1"
+thiserror = "2.0.17"
+arboard = "3.6.1"
+yore = "1.1.0"
+unicode-width = "0.2.2"
+ab_glyph = "0.2.32"
+tiny-skia = "0.11.4"
+
+[dev-dependencies]
+tempfile = "3.23.0"
+heapless = "0.8.0"
