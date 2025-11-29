@@ -1,11 +1,8 @@
-use crate::{
-    image_renderer::{render_size::calculate_char_size, ImageRendererError},
-    screen_builder::Size,
-};
+use crate::image_renderer::{render_size::calculate_char_size, ImageRendererError};
 use ab_glyph::{FontArc, PxScale};
 use image::{Rgba, RgbaImage};
 use imageproc::drawing::draw_text_mut;
-use tiny_skia::{Color, Paint, PathBuilder, Pixmap, Rect, Transform};
+use tiny_skia::{Color, Paint, PathBuilder, Pixmap, Rect, Size, Transform};
 
 #[derive(Debug)]
 pub struct Canvas {
@@ -68,26 +65,34 @@ impl Canvas {
         }
     }
 
-    pub fn draw_char(
+    pub fn draw_text(
         &mut self,
-        char: char,
+        text: &str,
         x: i32,
         y: i32,
         color: Option<Rgba<u8>>,
         background: Option<Rgba<u8>>,
     ) {
+        let fg = color.unwrap_or(self.default_fg_color);
+
         if let Some(bg_color) = background {
-            self.fill_rect(x, y, self.char_width(), self.char_height(), bg_color);
+            self.fill_rect(
+                x,
+                y,
+                text.chars().count() as u32 * self.char_width(),
+                self.char_height(),
+                bg_color,
+            );
         }
 
         draw_text_mut(
             &mut self.image_for_text,
-            color.unwrap_or(self.default_fg_color),
+            fg,
             x,
             y,
             self.scale,
             &self.font,
-            &char.to_string(),
+            text,
         );
     }
 
@@ -100,11 +105,11 @@ impl Canvas {
     }
 
     pub fn char_width(&self) -> u32 {
-        self.char_size.width
+        self.char_size.width() as u32
     }
 
     pub fn char_height(&self) -> u32 {
-        self.char_size.height
+        self.char_size.height() as u32
     }
 
     pub fn to_final_image(&self) -> Result<RgbaImage, ImageRendererError> {

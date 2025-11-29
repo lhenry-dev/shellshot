@@ -1,17 +1,15 @@
-use std::sync::OnceLock;
-
 use ab_glyph::FontArc;
 use image::Rgba;
+use termwiz::cell::Cell;
+use tiny_skia::Size;
 
 use crate::constants::DEFAULT_BG_COLOR;
 use crate::constants::DEFAULT_FG_COLOR;
 use crate::image_renderer::canvas::Canvas;
 use crate::image_renderer::ImageRendererError;
-use crate::screen_builder::ansi::GREEN;
-use crate::screen_builder::ansi::RED;
-use crate::screen_builder::ansi::YELLOW;
-use crate::screen_builder::Cell;
-use crate::screen_builder::Size;
+use crate::window_decoration::communs::default_build_command_line;
+use crate::window_decoration::communs::default_font;
+use crate::window_decoration::communs::get_default_color_palette;
 use crate::window_decoration::WindowMetrics;
 
 use super::WindowDecoration;
@@ -19,38 +17,20 @@ use super::WindowDecoration;
 #[derive(Debug)]
 pub struct Classic;
 
+const GREEN: Rgba<u8> = Rgba([52, 199, 89, 255]);
+const YELLOW: Rgba<u8> = Rgba([255, 189, 45, 255]);
+const RED: Rgba<u8> = Rgba([255, 95, 87, 255]);
+
 const BORDER_COLOR: [u8; 4] = [128, 128, 128, 255];
 const BACKGROUND_COLOR: [u8; 4] = DEFAULT_BG_COLOR;
 
-static CASCADIA_CODE_FONT_DATA: &[u8] = include_bytes!("../../assets/CascadiaCode.ttf");
-static CASCADIA_CODE_FONT: OnceLock<Result<FontArc, ImageRendererError>> = OnceLock::new();
-
 impl WindowDecoration for Classic {
     fn build_command_line(&self, command: &str) -> Vec<Cell> {
-        let s = format!("$ {command}");
-
-        let mut chars = s.chars();
-        let mut cells = Vec::with_capacity(s.len());
-
-        if let Some(first) = chars.next() {
-            cells.push(Cell {
-                ch: first,
-                fg: Some(GREEN),
-                bg: None,
-            });
-        }
-
-        cells.extend(chars.map(|ch| Cell {
-            ch,
-            fg: None,
-            bg: None,
-        }));
-
-        cells
+        default_build_command_line(command)
     }
 
     fn compute_metrics(&self, char_size: Size) -> WindowMetrics {
-        let char_height = char_size.height;
+        let char_height = char_size.height() as u32;
 
         let padding = char_height;
         let border_width = 0;
@@ -63,18 +43,16 @@ impl WindowDecoration for Classic {
         }
     }
 
+    fn get_color_palette(&self) -> [Rgba<u8>; 256] {
+        get_default_color_palette()
+    }
+
     fn default_fg_color(&self) -> Rgba<u8> {
         Rgba(DEFAULT_FG_COLOR)
     }
 
     fn font(&self) -> Result<&FontArc, ImageRendererError> {
-        CASCADIA_CODE_FONT
-            .get_or_init(|| {
-                FontArc::try_from_slice(CASCADIA_CODE_FONT_DATA)
-                    .map_err(|_| ImageRendererError::FontLoadError)
-            })
-            .as_ref()
-            .map_err(|_| ImageRendererError::FontLoadError)
+        default_font()
     }
 
     fn draw_window(

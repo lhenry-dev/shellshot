@@ -1,16 +1,18 @@
 use crate::{
     image_renderer::{canvas::Canvas, ImageRendererError},
-    screen_builder::{Cell, Size},
     window_decoration::no_decoration::NoDecoration,
 };
 
 mod classic;
+mod communs;
 mod no_decoration;
 
 use ab_glyph::FontArc;
 use clap::ValueEnum;
 pub use classic::Classic;
 use image::Rgba;
+use termwiz::cell::Cell;
+use tiny_skia::Size;
 
 /// Type of window decoration to apply around the rendered content
 #[derive(Clone, Debug, ValueEnum)]
@@ -32,6 +34,8 @@ pub trait WindowDecoration: std::fmt::Debug {
     fn compute_metrics(&self, char_size: Size) -> WindowMetrics;
 
     fn default_fg_color(&self) -> Rgba<u8>;
+
+    fn get_color_palette(&self) -> [Rgba<u8>; 256];
 
     fn font(&self) -> Result<&FontArc, ImageRendererError>;
 
