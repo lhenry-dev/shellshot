@@ -61,27 +61,27 @@ impl ImageRenderer {
         screen: &Surface,
         window_decoration: Box<dyn WindowDecoration>,
     ) -> Result<RgbaImage, ImageRendererError> {
-        let mut renderer = Self::create_renderer(screen, window_decoration)?;
+        let mut renderer = Self::create_renderer(command, screen, window_decoration)?;
         renderer.compose_image(command, screen)
     }
 
     fn create_renderer(
+        command: &[String],
         screen: &Surface,
         window_decoration: Box<dyn WindowDecoration>,
     ) -> Result<Self, ImageRendererError> {
         let font = window_decoration.font()?;
-        let default_fg_color = window_decoration.default_fg_color();
 
         let scale = PxScale::from((FONT_SIZE * QUALITY_MULTIPLIER) as f32);
         let char_size = calculate_char_size(font, scale);
+        let command_line = window_decoration.build_command_line(&command.join(" "));
 
         let metrics = window_decoration.compute_metrics(char_size);
-        let image_size = calculate_image_size(screen, &metrics, char_size);
+        let image_size = calculate_image_size(&command_line, screen, &metrics, char_size);
         let canvas = Canvas::new(
             image_size.width() as u32,
             image_size.height() as u32,
             font.clone(),
-            default_fg_color,
             scale,
         )?;
 
@@ -116,6 +116,7 @@ impl ImageRenderer {
         let start_y =
             self.metrics.border_width + self.metrics.title_bar_height + self.metrics.padding;
 
+        let default_fg_color = self.window_decoration.default_fg_color();
         let color_palette = self.window_decoration.get_color_palette();
 
         let command_line = self
@@ -128,14 +129,11 @@ impl ImageRenderer {
             let x = i32::try_from(start_x + x_offset)?;
 
             let text = cell.str();
+            let color = resolve_rgba_with_palette(color_palette, cell.attrs().foreground())
+                .unwrap_or(default_fg_color);
+            let background = resolve_rgba_with_palette(color_palette, cell.attrs().background());
 
-            self.canvas.draw_text(
-                text,
-                x,
-                y,
-                resolve_rgba_with_palette(color_palette, cell.attrs().foreground()),
-                resolve_rgba_with_palette(color_palette, cell.attrs().background()),
-            );
+            self.canvas.draw_text(text, x, y, color, background);
 
             let text_width = text
                 .chars()
@@ -152,6 +150,7 @@ impl ImageRenderer {
         let start_y =
             self.metrics.border_width + self.metrics.title_bar_height + self.metrics.padding;
 
+        let default_fg_color = self.window_decoration.default_fg_color();
         let color_palette = self.window_decoration.get_color_palette();
 
         for (row_idx, line) in screen.screen_lines().iter().enumerate() {
@@ -163,14 +162,12 @@ impl ImageRenderer {
                 let x = i32::try_from(start_x + x_offset)?;
 
                 let text = cell.str();
+                let color = resolve_rgba_with_palette(color_palette, cell.attrs().foreground())
+                    .unwrap_or(default_fg_color);
+                let background =
+                    resolve_rgba_with_palette(color_palette, cell.attrs().background());
 
-                self.canvas.draw_text(
-                    text,
-                    x,
-                    y,
-                    resolve_rgba_with_palette(color_palette, cell.attrs().foreground()),
-                    resolve_rgba_with_palette(color_palette, cell.attrs().background()),
-                );
+                self.canvas.draw_text(text, x, y, color, background);
 
                 let text_width = text
                     .chars()

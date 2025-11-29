@@ -1,15 +1,4 @@
-use termwiz::surface::Surface;
-
-use crate::terminal_builder::constants::TAB_WIDTH;
-
-#[expect(dead_code)]
-pub fn ensure_height(surface: &mut Surface, min_height: usize) {
-    let (width, height) = surface.dimensions();
-
-    if min_height >= height {
-        surface.resize(width, min_height + 1);
-    }
-}
+pub const TAB_WIDTH: usize = 8;
 
 pub fn tabulate(pos: usize, n: usize) -> usize {
     pos + (TAB_WIDTH * n - pos % TAB_WIDTH)

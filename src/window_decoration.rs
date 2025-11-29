@@ -96,19 +96,12 @@ mod tests {
             let window_decoration = create_window_decoration(decoration_type.as_ref());
 
             let font = window_decoration.font().expect("Font should be available");
-            let default_fg_color = window_decoration.default_fg_color();
 
             let char_size = calculate_char_size(font, scale);
             let metrics = window_decoration.compute_metrics(char_size);
 
-            let mut canvas = Canvas::new(
-                canvas_width,
-                canvas_height,
-                font.clone(),
-                default_fg_color,
-                scale,
-            )
-            .expect("Failed to create Canvas");
+            let mut canvas = Canvas::new(canvas_width, canvas_height, font.clone(), scale)
+                .expect("Failed to create Canvas");
 
             let result = window_decoration.draw_window(&mut canvas, &metrics);
             assert!(

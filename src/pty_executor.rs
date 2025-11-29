@@ -8,17 +8,22 @@ pub struct PtyProcess {
     pub writer: Box<dyn Write + Send>,
 }
 
+pub struct PtyOptions {
+    pub rows: u16,
+    pub cols: u16,
+}
+
 pub struct PtyExecutor {
     pair: PtyPair,
 }
 
 impl PtyExecutor {
-    pub fn new(rows: u16, cols: u16) -> Result<Self> {
+    pub fn new(pty_options: &PtyOptions) -> Result<Self> {
         let pty_system = native_pty_system();
 
         let pair = pty_system.openpty(PtySize {
-            rows,
-            cols,
+            rows: pty_options.rows,
+            cols: pty_options.cols,
             pixel_width: 0,
             pixel_height: 0,
         })?;
@@ -43,9 +48,8 @@ impl PtyExecutor {
             cmd.cwd(".");
         }
 
-        let child = self.pair.slave.spawn_command(cmd)?;
-
         let reader = BufReader::new(self.pair.master.try_clone_reader()?);
+        let child = self.pair.slave.spawn_command(cmd)?;
         let writer = self.pair.master.take_writer()?;
 
         Ok(PtyProcess {

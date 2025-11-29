@@ -3,13 +3,14 @@ use image::Rgba;
 use termwiz::cell::Cell;
 use tiny_skia::Size;
 
-use crate::constants::DEFAULT_BG_COLOR;
-use crate::constants::DEFAULT_FG_COLOR;
 use crate::image_renderer::canvas::Canvas;
+use crate::image_renderer::canvas::Corners;
 use crate::image_renderer::ImageRendererError;
 use crate::window_decoration::communs::default_build_command_line;
 use crate::window_decoration::communs::default_font;
 use crate::window_decoration::communs::get_default_color_palette;
+use crate::window_decoration::communs::DEFAULT_BG_COLOR;
+use crate::window_decoration::communs::DEFAULT_FG_COLOR;
 use crate::window_decoration::WindowMetrics;
 
 use super::WindowDecoration;
@@ -22,7 +23,6 @@ const YELLOW: Rgba<u8> = Rgba([255, 189, 45, 255]);
 const RED: Rgba<u8> = Rgba([255, 95, 87, 255]);
 
 const BORDER_COLOR: [u8; 4] = [128, 128, 128, 255];
-const BACKGROUND_COLOR: [u8; 4] = DEFAULT_BG_COLOR;
 
 impl WindowDecoration for Classic {
     fn build_command_line(&self, command: &str) -> Vec<Cell> {
@@ -33,7 +33,7 @@ impl WindowDecoration for Classic {
         let char_height = char_size.height() as u32;
 
         let padding = char_height;
-        let border_width = 0;
+        let border_width = 1;
         let title_bar_height = char_height;
 
         WindowMetrics {
@@ -68,22 +68,30 @@ fn draw_window_decorations(
     canvas: &mut Canvas,
     metrics: &WindowMetrics,
 ) -> Result<(), ImageRendererError> {
-    canvas.fill(Rgba(BORDER_COLOR));
+    canvas.fill_rounded(
+        Rgba(BORDER_COLOR),
+        metrics.title_bar_height as f32 / 4.0,
+        Corners::ALL,
+    );
 
-    canvas.fill_rect(
+    canvas.fill_rounded_rect(
         i32::try_from(metrics.border_width)?,
         i32::try_from(metrics.border_width)?,
         canvas.width() - 2 * metrics.border_width,
         canvas.height() - 2 * metrics.border_width,
-        Rgba(BACKGROUND_COLOR),
+        Rgba(DEFAULT_BG_COLOR),
+        metrics.title_bar_height as f32 / 4.0,
+        Corners::ALL,
     );
 
-    canvas.fill_rect(
+    canvas.fill_rounded_rect(
         i32::try_from(metrics.border_width)?,
         i32::try_from(metrics.border_width)?,
         canvas.width() - 2 * metrics.border_width,
         metrics.title_bar_height,
         Rgba([30, 34, 42, 255]),
+        metrics.title_bar_height as f32 / 4.0,
+        Corners::TOP_LEFT | Corners::TOP_RIGHT,
     );
 
     draw_window_buttons(canvas, metrics)
@@ -99,11 +107,11 @@ fn draw_window_buttons(
 
     let right = i32::try_from(canvas.width() - metrics.border_width)?;
 
-    canvas.draw_circle(right - spacing, btn_y, radius, GREEN);
+    canvas.draw_circle(right - spacing, btn_y, radius, RED);
 
     canvas.draw_circle(right - 2 * spacing, btn_y, radius, YELLOW);
 
-    canvas.draw_circle(right - 3 * spacing, btn_y, radius, RED);
+    canvas.draw_circle(right - 3 * spacing, btn_y, radius, GREEN);
 
     Ok(())
 }

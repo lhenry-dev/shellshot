@@ -1,5 +1,6 @@
 use anyhow::Result;
 use std::io::BufRead;
+use termwiz::color::ColorAttribute;
 use termwiz::escape::parser::Parser;
 use termwiz::surface::Surface;
 
@@ -7,7 +8,6 @@ use crate::pty_executor::PtyProcess;
 use crate::terminal_builder::action::process_action;
 
 mod action;
-mod constants;
 mod utils;
 
 pub struct TerminalBuilder {
@@ -21,7 +21,11 @@ impl TerminalBuilder {
             pty_process,
             surface: Surface::new(cols.into(), rows.into()),
         };
-        terminal.run_loop()
+
+        terminal.run_loop().unwrap();
+        terminal.resize_surface();
+
+        Ok(terminal.surface.clone())
     }
 
     fn run_loop(&mut self) -> Result<Surface> {
@@ -42,7 +46,8 @@ impl TerminalBuilder {
             parser.parse(buf, |action| action.append_to(&mut actions));
 
             for action in actions {
-                process_action(surface, writer, action);
+                let seq = process_action(surface, writer, action);
+                surface.flush_changes_older_than(seq);
             }
 
             let len = buf.len();
@@ -54,14 +59,44 @@ impl TerminalBuilder {
             }
         }
 
-        let screen = self.surface.screen_cells();
-        for line in screen {
-            for cell in line {
-                print!("{}", cell.str());
-            }
-            println!();
-        }
+        // let screen = self.surface.screen_cells();
+        // for line in screen {
+        //     for cell in line {
+        //         print!("{}", cell.str());
+        //     }
+        //     println!();
+        // }
 
         Ok(self.surface.clone())
+    }
+
+    pub fn resize_surface(&mut self) {
+        let lines = self.surface.screen_lines();
+
+        let rows = lines
+            .iter()
+            .rposition(|line| {
+                line.visible_cells().any(|cell| {
+                    !cell.str().trim().is_empty()
+                        || !matches!(cell.attrs().background(), ColorAttribute::Default)
+                })
+            })
+            .map(|idx| idx + 1)
+            .unwrap_or(0);
+
+        let cols = lines
+            .iter()
+            .map(|line| {
+                line.visible_cells()
+                    .filter(|cell| {
+                        !cell.str().trim().is_empty()
+                            || !matches!(cell.attrs().background(), ColorAttribute::Default)
+                    })
+                    .count()
+            })
+            .max()
+            .unwrap_or(0);
+
+        self.surface.resize(cols, rows);
     }
 }

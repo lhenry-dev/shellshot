@@ -8,8 +8,6 @@ use crate::terminal_builder::utils::tabulate;
 pub fn process_control(surface: &mut Surface, control_code: ControlCode) -> SequenceNo {
     match control_code {
         ControlCode::LineFeed | ControlCode::VerticalTab | ControlCode::FormFeed => {
-            // let (_, y) = surface.cursor_position();
-            // ensure_height(surface, y + 1);
             surface.add_change("\r\n")
         }
         ControlCode::CarriageReturn => surface.add_change("\r"),
@@ -43,6 +41,58 @@ pub fn process_control(surface: &mut Surface, control_code: ControlCode) -> Sequ
                 })
             }
         }
-        _ => SEQ_ZERO,
+        ControlCode::Null
+        | ControlCode::StartOfHeading
+        | ControlCode::StartOfText
+        | ControlCode::EndOfText
+        | ControlCode::EndOfTransmission
+        | ControlCode::Enquiry
+        | ControlCode::Acknowledge
+        | ControlCode::Bell
+        | ControlCode::ShiftOut
+        | ControlCode::ShiftIn
+        | ControlCode::DataLinkEscape
+        | ControlCode::DeviceControlOne
+        | ControlCode::DeviceControlTwo
+        | ControlCode::DeviceControlThree
+        | ControlCode::DeviceControlFour
+        | ControlCode::NegativeAcknowledge
+        | ControlCode::SynchronousIdle
+        | ControlCode::EndOfTransmissionBlock
+        | ControlCode::Cancel
+        | ControlCode::EndOfMedium
+        | ControlCode::Substitute
+        | ControlCode::Escape
+        | ControlCode::FileSeparator
+        | ControlCode::GroupSeparator
+        | ControlCode::RecordSeparator
+        | ControlCode::UnitSeparator
+        | ControlCode::BPH
+        | ControlCode::NBH
+        | ControlCode::IND
+        | ControlCode::SSA
+        | ControlCode::ESA
+        | ControlCode::HTS
+        | ControlCode::HTJ
+        | ControlCode::VTS
+        | ControlCode::PLD
+        | ControlCode::PLU
+        | ControlCode::SS2
+        | ControlCode::SS3
+        | ControlCode::DCS
+        | ControlCode::PU1
+        | ControlCode::PU2
+        | ControlCode::STS
+        | ControlCode::CCH
+        | ControlCode::MW
+        | ControlCode::SPA
+        | ControlCode::EPA
+        | ControlCode::SOS
+        | ControlCode::SCI
+        | ControlCode::CSI
+        | ControlCode::ST
+        | ControlCode::OSC
+        | ControlCode::PM
+        | ControlCode::APC => SEQ_ZERO,
     }
 }

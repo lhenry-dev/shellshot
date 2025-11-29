@@ -2,14 +2,23 @@ use crate::image_renderer::{render_size::calculate_char_size, ImageRendererError
 use ab_glyph::{FontArc, PxScale};
 use image::{Rgba, RgbaImage};
 use imageproc::drawing::draw_text_mut;
-use tiny_skia::{Color, Paint, PathBuilder, Pixmap, Rect, Size, Transform};
+use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Rect, Size, Transform};
+
+bitflags::bitflags! {
+    pub struct Corners: u8 {
+        const TOP_LEFT     = 0b0001;
+        const TOP_RIGHT    = 0b0010;
+        const BOTTOM_RIGHT = 0b0100;
+        const BOTTOM_LEFT  = 0b1000;
+        const ALL = Self::TOP_LEFT.bits() | Self::TOP_RIGHT.bits() | Self::BOTTOM_RIGHT.bits() | Self::BOTTOM_LEFT.bits();
+    }
+}
 
 #[derive(Debug)]
 pub struct Canvas {
     pixmap: Pixmap,
     image_for_text: RgbaImage,
     font: FontArc,
-    default_fg_color: Rgba<u8>,
     scale: PxScale,
     char_size: Size,
 }
@@ -19,7 +28,6 @@ impl Canvas {
         width: u32,
         height: u32,
         font: FontArc,
-        default_fg_color: Rgba<u8>,
         scale: PxScale,
     ) -> Result<Self, ImageRendererError> {
         let pixmap = Pixmap::new(width, height).ok_or(ImageRendererError::CanvasInitFailed)?;
@@ -30,7 +38,6 @@ impl Canvas {
             pixmap,
             image_for_text,
             font,
-            default_fg_color,
             scale,
             char_size,
         })
@@ -41,6 +48,18 @@ impl Canvas {
             .fill(Color::from_rgba8(color[0], color[1], color[2], color[3]));
     }
 
+    pub fn fill_rounded(&mut self, color: Rgba<u8>, radius: f32, corners: Corners) {
+        self.fill_rounded_rect(
+            0,
+            0,
+            self.pixmap.width(),
+            self.pixmap.height(),
+            color,
+            radius,
+            corners,
+        );
+    }
+
     pub fn fill_rect(&mut self, x: i32, y: i32, width: u32, height: u32, color: Rgba<u8>) {
         if let Some(rect) = Rect::from_xywh(x as f32, y as f32, width as f32, height as f32) {
             let mut paint = Paint::default();
@@ -48,6 +67,72 @@ impl Canvas {
             self.pixmap
                 .fill_rect(rect, &paint, Transform::identity(), None);
         }
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    pub fn fill_rounded_rect(
+        &mut self,
+        x: i32,
+        y: i32,
+        width: u32,
+        height: u32,
+        color: Rgba<u8>,
+        radius: f32,
+        corners: Corners,
+    ) {
+        let x = x as f32;
+        let y = y as f32;
+        let width = width as f32;
+        let height = height as f32;
+
+        let mut pb = PathBuilder::new();
+
+        if corners.contains(Corners::TOP_LEFT) {
+            pb.move_to(x + radius, y);
+        } else {
+            pb.move_to(x, y);
+        }
+
+        if corners.contains(Corners::TOP_RIGHT) {
+            pb.line_to(x + width - radius, y);
+            pb.quad_to(x + width, y, x + width, y + radius);
+        } else {
+            pb.line_to(x + width, y);
+        }
+
+        if corners.contains(Corners::BOTTOM_RIGHT) {
+            pb.line_to(x + width, y + height - radius);
+            pb.quad_to(x + width, y + height, x + width - radius, y + height);
+        } else {
+            pb.line_to(x + width, y + height);
+        }
+
+        if corners.contains(Corners::BOTTOM_LEFT) {
+            pb.line_to(x + radius, y + height);
+            pb.quad_to(x, y + height, x, y + height - radius);
+        } else {
+            pb.line_to(x, y + height);
+        }
+
+        if corners.contains(Corners::TOP_LEFT) {
+            pb.line_to(x, y + radius);
+            pb.quad_to(x, y, x + radius, y);
+        } else {
+            pb.line_to(x, y);
+        }
+
+        let path = pb.finish().unwrap();
+
+        let mut paint = Paint::default();
+        paint.set_color(Color::from_rgba8(color[0], color[1], color[2], color[3]));
+
+        self.pixmap.fill_path(
+            &path,
+            &paint,
+            FillRule::Winding,
+            Transform::identity(),
+            None,
+        );
     }
 
     pub fn draw_circle(&mut self, x: i32, y: i32, radius: i32, color: Rgba<u8>) {
@@ -70,11 +155,9 @@ impl Canvas {
         text: &str,
         x: i32,
         y: i32,
-        color: Option<Rgba<u8>>,
+        color: Rgba<u8>,
         background: Option<Rgba<u8>>,
     ) {
-        let fg = color.unwrap_or(self.default_fg_color);
-
         if let Some(bg_color) = background {
             self.fill_rect(
                 x,
@@ -87,7 +170,7 @@ impl Canvas {
 
         draw_text_mut(
             &mut self.image_for_text,
-            fg,
+            color,
             x,
             y,
             self.scale,

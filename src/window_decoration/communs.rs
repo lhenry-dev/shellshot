@@ -9,6 +9,9 @@ use termwiz::{
 
 use crate::image_renderer::ImageRendererError;
 
+pub const DEFAULT_BG_COLOR: [u8; 4] = [40, 44, 52, 255];
+pub const DEFAULT_FG_COLOR: [u8; 4] = [238, 232, 213, 255];
+
 pub static CASCADIA_CODE_FONT_DATA: &[u8] = include_bytes!("../../assets/CascadiaCode.ttf");
 pub static CASCADIA_CODE_FONT: OnceLock<Result<FontArc, ImageRendererError>> = OnceLock::new();
 
@@ -18,15 +21,17 @@ pub fn default_build_command_line(command: &str) -> Vec<Cell> {
     let mut prompt_attrs = CellAttributes::blank();
     prompt_attrs.set_foreground(ColorAttribute::PaletteIndex(10));
 
-    cells.push(Cell::new('$', prompt_attrs.clone()));
-
-    cells.push(Cell::new(' ', prompt_attrs));
-
     let default_attrs = CellAttributes::blank();
 
-    for ch in command.chars() {
-        cells.push(Cell::new(ch, default_attrs.clone()));
-    }
+    cells.push(Cell::new('$', prompt_attrs));
+
+    cells.push(Cell::new(' ', default_attrs.clone()));
+
+    cells.extend(
+        command
+            .chars()
+            .map(|ch| Cell::new(ch, default_attrs.clone())),
+    );
 
     cells
 }

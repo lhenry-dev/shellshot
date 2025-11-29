@@ -4,7 +4,7 @@ use thiserror::Error;
 use crate::{
     image_generator::{self, SaveError},
     image_renderer::{ImageRenderer, ImageRendererError},
-    pty_executor::PtyExecutor,
+    pty_executor::{PtyExecutor, PtyOptions},
     terminal_builder::TerminalBuilder,
     window_decoration::{create_window_decoration, WindowDecorationType},
 };
@@ -66,12 +66,14 @@ pub struct Args {
 pub fn run_shellshot(args: Args) -> Result<(), ShellshotError> {
     println!("Starting shellshot v{}", env!("CARGO_PKG_VERSION"));
 
-    let rows = 60;
-    let cols = 180;
+    let rows = 200;
+    let cols = 250;
 
     println!("Executing command: {:?}", args.command);
 
-    let executor = PtyExecutor::new(rows, cols).unwrap();
+    let pty_options = PtyOptions { rows, cols };
+
+    let executor = PtyExecutor::new(&pty_options).unwrap();
     let pty_process = executor.run_command(&args.command).unwrap();
     let screen = TerminalBuilder::run(pty_process, rows, cols).unwrap();
     // let output = PlatformExecutor::execute_command(&command_str)?;

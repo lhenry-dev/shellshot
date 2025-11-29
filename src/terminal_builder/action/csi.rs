@@ -1,4 +1,7 @@
-use std::{io::Write, sync::Mutex};
+use std::{
+    io::{self},
+    sync::Mutex,
+};
 
 use once_cell::sync::Lazy;
 use termwiz::{
@@ -14,17 +17,18 @@ use crate::terminal_builder::utils::{tabulate, tabulate_back};
 
 static SAVED_POSITIONS: Lazy<Mutex<Vec<(usize, usize)>>> = Lazy::new(|| Mutex::new(Vec::new()));
 
-pub fn process_csi(
-    surface: &mut Surface,
-    writer: &mut Box<dyn Write + Send>,
-    csi: CSI,
-) -> SequenceNo {
+pub fn process_csi(surface: &mut Surface, writer: &mut dyn io::Write, csi: CSI) -> SequenceNo {
     match csi {
         CSI::Sgr(sgr) => process_sgr(surface, sgr),
         CSI::Cursor(cursor) => process_cursor(surface, writer, cursor),
-        CSI::Edit(_edit) => SEQ_ZERO,
-        CSI::Mode(_mode) => SEQ_ZERO,
-        _ => SEQ_ZERO,
+        CSI::Edit(_)
+        | CSI::Mode(_)
+        | CSI::Device(_)
+        | CSI::Mouse(_)
+        | CSI::Window(_)
+        | CSI::Keyboard(_)
+        | CSI::SelectCharacterPath(_, _)
+        | CSI::Unspecified(_) => SEQ_ZERO,
     }
 }
 
@@ -37,8 +41,6 @@ fn process_sgr(surface: &mut Surface, sgr: Sgr) -> SequenceNo {
         Sgr::Underline(underline) => {
             surface.add_change(Change::Attribute(AttributeChange::Underline(underline)))
         }
-        Sgr::UnderlineColor(_) => SEQ_ZERO,
-        Sgr::Blink(_) => SEQ_ZERO,
         Sgr::Inverse(inverse) => {
             surface.add_change(Change::Attribute(AttributeChange::Reverse(inverse)))
         }
@@ -57,15 +59,15 @@ fn process_sgr(surface: &mut Surface, sgr: Sgr) -> SequenceNo {
         Sgr::Invisible(enabled) => {
             surface.add_change(Change::Attribute(AttributeChange::Invisible(enabled)))
         }
-        _ => SEQ_ZERO,
+        Sgr::UnderlineColor(_)
+        | Sgr::Blink(_)
+        | Sgr::Font(_)
+        | Sgr::Overline(_)
+        | Sgr::VerticalAlign(_) => SEQ_ZERO,
     }
 }
 
-fn process_cursor(
-    surface: &mut Surface,
-    writer: &mut Box<dyn Write + Send>,
-    cursor: Cursor,
-) -> SequenceNo {
+fn process_cursor(surface: &mut Surface, writer: &mut dyn io::Write, cursor: Cursor) -> SequenceNo {
     match cursor {
         Cursor::BackwardTabulation(n) => surface.add_change(Change::CursorPosition {
             x: Position::Absolute(tabulate_back(surface.cursor_position().0, n as usize)),
@@ -163,6 +165,12 @@ fn process_cursor(
             println!("Reported cursor position: line {}, col {}", line, col);
             SEQ_ZERO
         }
-        _ => SEQ_ZERO,
+        Cursor::TabulationClear(_)
+        | Cursor::ActivePositionReport { .. }
+        | Cursor::TabulationControl(_)
+        | Cursor::LineTabulation(_)
+        | Cursor::SetTopAndBottomMargins { .. }
+        | Cursor::SetLeftAndRightMargins { .. }
+        | Cursor::CursorStyle(_) => SEQ_ZERO,
     }
 }

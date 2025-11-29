@@ -3,21 +3,19 @@ use image::Rgba;
 use termwiz::cell::Cell;
 use tiny_skia::Size;
 
-use crate::constants::DEFAULT_BG_COLOR;
-use crate::constants::DEFAULT_FG_COLOR;
 use crate::image_renderer::canvas::Canvas;
 use crate::image_renderer::ImageRendererError;
 use crate::window_decoration::communs::default_build_command_line;
 use crate::window_decoration::communs::default_font;
 use crate::window_decoration::communs::get_default_color_palette;
+use crate::window_decoration::communs::DEFAULT_BG_COLOR;
+use crate::window_decoration::communs::DEFAULT_FG_COLOR;
 use crate::window_decoration::WindowMetrics;
 
 use super::WindowDecoration;
 
 #[derive(Debug)]
 pub struct NoDecoration;
-
-const BACKGROUND_COLOR: [u8; 4] = DEFAULT_BG_COLOR;
 
 impl WindowDecoration for NoDecoration {
     fn build_command_line(&self, command: &str) -> Vec<Cell> {
@@ -51,7 +49,7 @@ impl WindowDecoration for NoDecoration {
         canvas: &mut Canvas,
         _metrics: &WindowMetrics,
     ) -> Result<(), ImageRendererError> {
-        canvas.fill(Rgba(BACKGROUND_COLOR));
+        canvas.fill(Rgba(DEFAULT_BG_COLOR));
         Ok(())
     }
 }

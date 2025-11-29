@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::io::{self};
 
 use termwiz::{
     escape::Action,
@@ -19,7 +19,7 @@ mod print;
 
 pub fn process_action(
     surface: &mut Surface,
-    writer: &mut Box<dyn Write + Send>,
+    writer: &mut dyn io::Write,
     action: Action,
 ) -> SequenceNo {
     println!("Processing action: {:?}", action);
@@ -30,7 +30,7 @@ pub fn process_action(
         Action::Control(control_code) => process_control(surface, control_code),
         Action::DeviceControl(_device_control_mode) => SEQ_ZERO,
         Action::OperatingSystemCommand(operating_system_command) => {
-            process_operating_system_command(surface, *operating_system_command)
+            process_operating_system_command(surface, writer, *operating_system_command)
         }
         Action::CSI(csi) => process_csi(surface, writer, csi),
         Action::Esc(_esc) => SEQ_ZERO,
