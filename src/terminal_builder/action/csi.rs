@@ -7,7 +7,7 @@ use once_cell::sync::Lazy;
 use termwiz::{
     cell::AttributeChange,
     escape::{
-        csi::{Cursor, Sgr},
+        csi::{Cursor, Edit, Sgr},
         OneBased, CSI,
     },
     surface::{Change, Position, SequenceNo, Surface, SEQ_ZERO},
@@ -21,8 +21,8 @@ pub fn process_csi(surface: &mut Surface, writer: &mut dyn io::Write, csi: CSI) 
     match csi {
         CSI::Sgr(sgr) => process_sgr(surface, sgr),
         CSI::Cursor(cursor) => process_cursor(surface, writer, cursor),
-        CSI::Edit(_)
-        | CSI::Mode(_)
+        CSI::Edit(edit) => process_edit(surface, edit),
+        CSI::Mode(_)
         | CSI::Device(_)
         | CSI::Mouse(_)
         | CSI::Window(_)
@@ -158,8 +158,7 @@ fn process_cursor(surface: &mut Surface, writer: &mut dyn io::Write, cursor: Cur
             let col = OneBased::from_zero_based(cursor_position.0 as u32);
             let line = OneBased::from_zero_based(cursor_position.1 as u32);
 
-            // let report = CSI::Cursor(Cursor::ActivePositionReport { line, col });
-            let report = format!("\x1b[{};{}R", line, col);
+            let report = CSI::Cursor(Cursor::ActivePositionReport { line, col });
             write!(writer, "{report}").ok();
             writer.flush().ok();
             println!("Reported cursor position: line {}, col {}", line, col);
@@ -172,5 +171,28 @@ fn process_cursor(surface: &mut Surface, writer: &mut dyn io::Write, cursor: Cur
         | Cursor::SetTopAndBottomMargins { .. }
         | Cursor::SetLeftAndRightMargins { .. }
         | Cursor::CursorStyle(_) => SEQ_ZERO,
+    }
+}
+
+fn process_edit(surface: &mut Surface, edit: Edit) -> SequenceNo {
+    match edit {
+        Edit::DeleteCharacter(_) => SEQ_ZERO,
+        Edit::DeleteLine(_) => SEQ_ZERO,
+        Edit::EraseCharacter(n) => {
+            let (x, y) = surface.cursor_position();
+            surface.add_change(Change::Text(" ".repeat(n as usize)));
+            surface.add_change(Change::CursorPosition {
+                x: Position::Absolute(x),
+                y: Position::Absolute(y),
+            });
+            SEQ_ZERO
+        }
+        Edit::EraseInLine(_) => SEQ_ZERO,
+        Edit::InsertCharacter(_) => SEQ_ZERO,
+        Edit::InsertLine(_) => SEQ_ZERO,
+        Edit::ScrollDown(_) => SEQ_ZERO,
+        Edit::ScrollUp(_) => SEQ_ZERO,
+        Edit::EraseInDisplay(_) => SEQ_ZERO,
+        Edit::Repeat(_) => SEQ_ZERO,
     }
 }

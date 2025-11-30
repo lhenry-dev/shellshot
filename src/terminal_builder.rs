@@ -4,32 +4,41 @@ use termwiz::color::ColorAttribute;
 use termwiz::escape::parser::Parser;
 use termwiz::surface::Surface;
 
-use crate::pty_executor::PtyProcess;
+use crate::constants::{MAX_HEIGHT, MAX_WIDTH};
+use crate::pty_executor::dimension::Dimension;
+use crate::pty_executor::PtyIO;
 use crate::terminal_builder::action::process_action;
 
 mod action;
 mod utils;
 
 pub struct TerminalBuilder {
-    pty_process: PtyProcess,
+    pty_process: PtyIO,
     surface: Surface,
 }
 
 impl TerminalBuilder {
-    pub fn run(pty_process: PtyProcess, rows: u16, cols: u16) -> Result<Surface> {
+    pub fn run(pty_process: PtyIO, cols: &Dimension, rows: &Dimension) -> Result<Surface> {
         let mut terminal = Self {
             pty_process,
-            surface: Surface::new(cols.into(), rows.into()),
+            surface: Surface::new(
+                cols.to_u16(MAX_WIDTH).into(),
+                rows.to_u16(MAX_HEIGHT).into(),
+            ),
         };
 
         terminal.run_loop().unwrap();
-        terminal.resize_surface();
+        match (rows, cols) {
+            (Dimension::Auto, Dimension::Auto) => terminal.resize_surface(true, true),
+            (Dimension::Auto, Dimension::Value(_)) => terminal.resize_surface(true, false),
+            (Dimension::Value(_), Dimension::Auto) => terminal.resize_surface(false, true),
+            (Dimension::Value(_), Dimension::Value(_)) => (),
+        }
 
         Ok(terminal.surface.clone())
     }
 
     fn run_loop(&mut self) -> Result<Surface> {
-        let child = &mut self.pty_process.child;
         let reader = &mut self.pty_process.reader;
         let writer = &mut self.pty_process.writer;
         let surface = &mut self.surface;
@@ -52,51 +61,45 @@ impl TerminalBuilder {
 
             let len = buf.len();
             reader.consume(len);
-
-            if let Some(status) = child.try_wait()? {
-                println!("\nProcess exited: {:?}", status);
-                break;
-            }
         }
-
-        // let screen = self.surface.screen_cells();
-        // for line in screen {
-        //     for cell in line {
-        //         print!("{}", cell.str());
-        //     }
-        //     println!();
-        // }
 
         Ok(self.surface.clone())
     }
 
-    pub fn resize_surface(&mut self) {
+    pub fn resize_surface(&mut self, resize_cols: bool, resize_rows: bool) {
         let lines = self.surface.screen_lines();
+        let (current_cols, current_rows) = self.surface.dimensions();
 
-        let rows = lines
-            .iter()
-            .rposition(|line| {
-                line.visible_cells().any(|cell| {
-                    !cell.str().trim().is_empty()
-                        || !matches!(cell.attrs().background(), ColorAttribute::Default)
+        let new_cols = if resize_cols {
+            lines
+                .iter()
+                .map(|line| {
+                    let mut last_idx = 0;
+                    for cell in line.visible_cells() {
+                        if !(cell.str().chars().all(char::is_whitespace)
+                            && matches!(cell.attrs().background(), ColorAttribute::Default))
+                        {
+                            last_idx = cell.cell_index() + 1;
+                        }
+                    }
+                    last_idx
                 })
-            })
-            .map(|idx| idx + 1)
-            .unwrap_or(0);
+                .max()
+                .unwrap_or(0)
+        } else {
+            current_cols
+        };
 
-        let cols = lines
-            .iter()
-            .map(|line| {
-                line.visible_cells()
-                    .filter(|cell| {
-                        !cell.str().trim().is_empty()
-                            || !matches!(cell.attrs().background(), ColorAttribute::Default)
-                    })
-                    .count()
-            })
-            .max()
-            .unwrap_or(0);
+        let new_rows = if resize_rows {
+            lines
+                .iter()
+                .rposition(|line| !line.is_whitespace())
+                .map(|idx| idx + 1)
+                .unwrap_or(0)
+        } else {
+            current_rows
+        };
 
-        self.surface.resize(cols, rows);
+        self.surface.resize(new_cols, new_rows);
     }
 }

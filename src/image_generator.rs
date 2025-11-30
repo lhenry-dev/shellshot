@@ -28,9 +28,9 @@ pub enum SaveError {
 /// - Image encoding fails
 pub fn save_to_file(
     image_data: &ImageBuffer<Rgba<u8>, Vec<u8>>,
-    filename: &str,
+    output: &str,
 ) -> Result<(), SaveError> {
-    let path = Path::new(filename);
+    let path = Path::new(output);
 
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;

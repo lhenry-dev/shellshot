@@ -33,7 +33,7 @@ impl WindowDecoration for Classic {
         let char_height = char_size.height() as u32;
 
         let padding = char_height;
-        let border_width = 1;
+        let border_width = 0;
         let title_bar_height = char_height;
 
         WindowMetrics {

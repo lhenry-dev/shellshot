@@ -3,18 +3,32 @@ use termwiz::{
     surface::{Change, Position, SequenceNo, Surface, SEQ_ZERO},
 };
 
-use crate::terminal_builder::utils::tabulate;
-
 pub fn process_control(surface: &mut Surface, control_code: ControlCode) -> SequenceNo {
     match control_code {
-        ControlCode::LineFeed | ControlCode::VerticalTab | ControlCode::FormFeed => {
-            surface.add_change("\r\n")
-        }
-        ControlCode::CarriageReturn => surface.add_change("\r"),
-        ControlCode::HorizontalTab => surface.add_change(Change::CursorPosition {
-            x: Position::Absolute(tabulate(surface.cursor_position().0, 1)),
-            y: Position::Relative(0),
-        }),
+        ControlCode::LineFeed
+        | ControlCode::VerticalTab
+        | ControlCode::FormFeed
+        | ControlCode::CarriageReturn
+        | ControlCode::HorizontalTab
+        | ControlCode::ShiftOut
+        | ControlCode::ShiftIn
+        | ControlCode::DataLinkEscape
+        | ControlCode::DeviceControlOne
+        | ControlCode::DeviceControlTwo
+        | ControlCode::DeviceControlThree
+        | ControlCode::DeviceControlFour
+        | ControlCode::NegativeAcknowledge
+        | ControlCode::SynchronousIdle
+        | ControlCode::EndOfTransmissionBlock
+        | ControlCode::Cancel
+        | ControlCode::EndOfMedium
+        | ControlCode::Substitute
+        | ControlCode::Escape
+        | ControlCode::FileSeparator
+        | ControlCode::GroupSeparator
+        | ControlCode::RecordSeparator
+        | ControlCode::UnitSeparator => surface.add_change(control_code as u8 as char),
+
         ControlCode::Backspace => {
             surface.add_change(Change::CursorPosition {
                 x: Position::Relative(-1),
@@ -26,7 +40,7 @@ pub fn process_control(surface: &mut Surface, control_code: ControlCode) -> Sequ
                 y: Position::Relative(0),
             })
         }
-        ControlCode::NEL => surface.add_change("\r\n"),
+        ControlCode::NEL => SEQ_ZERO,
         ControlCode::RI => {
             let (x, y) = surface.cursor_position();
             if y == 0 {
@@ -49,24 +63,6 @@ pub fn process_control(surface: &mut Surface, control_code: ControlCode) -> Sequ
         | ControlCode::Enquiry
         | ControlCode::Acknowledge
         | ControlCode::Bell
-        | ControlCode::ShiftOut
-        | ControlCode::ShiftIn
-        | ControlCode::DataLinkEscape
-        | ControlCode::DeviceControlOne
-        | ControlCode::DeviceControlTwo
-        | ControlCode::DeviceControlThree
-        | ControlCode::DeviceControlFour
-        | ControlCode::NegativeAcknowledge
-        | ControlCode::SynchronousIdle
-        | ControlCode::EndOfTransmissionBlock
-        | ControlCode::Cancel
-        | ControlCode::EndOfMedium
-        | ControlCode::Substitute
-        | ControlCode::Escape
-        | ControlCode::FileSeparator
-        | ControlCode::GroupSeparator
-        | ControlCode::RecordSeparator
-        | ControlCode::UnitSeparator
         | ControlCode::BPH
         | ControlCode::NBH
         | ControlCode::IND

@@ -1,11 +1,10 @@
-use clap::Parser;
+use clap::{ArgGroup, Parser};
 use thiserror::Error;
 
 use crate::{
     image_generator::{self, SaveError},
     image_renderer::{ImageRenderer, ImageRendererError},
-    pty_executor::{PtyExecutor, PtyOptions},
-    terminal_builder::TerminalBuilder,
+    pty_executor::{dimension::Dimension, PtyExecutor, PtyOptions},
     window_decoration::{create_window_decoration, WindowDecorationType},
 };
 
@@ -28,14 +27,22 @@ pub enum ShellshotError {
 #[derive(Parser, Debug)]
 #[command(
     name = "shellshot",
-    about = "Transform command-line output into stunning, shareable images",
+    about = "Transform your command-line output into clean, shareable images with a single command.",
     version,
-    long_about = None
+    long_about = None,
+    group(ArgGroup::new("output_mode")
+        .required(true)
+        .args(&["output", "clipboard"])
+    )
 )]
 pub struct Args {
     /// Command to execute
-    #[arg(trailing_var_arg = true)]
+    #[arg(trailing_var_arg = true, required = true)]
     pub command: Vec<String>,
+
+    /// Do not print anything to stdout
+    #[arg(long, short = 'q')]
+    pub quiet: bool,
 
     /// Do not draw window decorations
     #[arg(long)]
@@ -45,13 +52,21 @@ pub struct Args {
     #[arg(long, short = 'd', default_value = "classic")]
     pub decoration: WindowDecorationType,
 
-    /// Specify output filename (default: out.png)
-    #[arg(long, short = 'f', default_value = "out.png")]
-    pub filename: Option<String>,
+    /// Specify output filename
+    #[arg(long, short = 'o', conflicts_with = "clipboard")]
+    pub output: Option<String>,
 
     /// Save to clipboard
-    #[arg(long)]
+    #[arg(long, conflicts_with = "output")]
     pub clipboard: bool,
+
+    /// Final image width in pixels, or 'auto'
+    #[arg(long, short = 'W', default_value = "auto")]
+    pub width: Dimension,
+
+    /// Final image height in pixels, or 'auto'
+    #[arg(long, short = 'H', default_value = "auto")]
+    pub height: Dimension,
 }
 
 /// Main entry point for shellshot logic
@@ -66,22 +81,18 @@ pub struct Args {
 pub fn run_shellshot(args: Args) -> Result<(), ShellshotError> {
     println!("Starting shellshot v{}", env!("CARGO_PKG_VERSION"));
 
-    let rows = 200;
-    let cols = 250;
-
     println!("Executing command: {:?}", args.command);
 
-    let pty_options = PtyOptions { rows, cols };
+    let pty_options = PtyOptions {
+        cols: args.width,
+        rows: args.height,
+    };
 
-    let executor = PtyExecutor::new(&pty_options).unwrap();
-    let pty_process = executor.run_command(&args.command).unwrap();
-    let screen = TerminalBuilder::run(pty_process, rows, cols).unwrap();
-    // let output = PlatformExecutor::execute_command(&command_str)?;
+    let screen = PtyExecutor::run_command(&pty_options, &args.command).unwrap();
 
     let decoration = (!args.no_decoration).then_some(args.decoration);
     let window_decoration = create_window_decoration(decoration.as_ref());
 
-    // let screen = ScreenBuilder::from_output(&output, &command_str, window_decoration.as_ref())?;
     let image_data = ImageRenderer::render_image(&args.command, &screen, window_decoration)?;
 
     if args.clipboard {
@@ -89,9 +100,10 @@ pub fn run_shellshot(args: Args) -> Result<(), ShellshotError> {
         println!("✅ Screenshot saved to clipboard");
     }
 
-    let filename = args.filename.unwrap_or_else(|| "out.png".to_string());
-    image_generator::save_to_file(&image_data, &filename)?;
-    println!("✅ Screenshot saved to {filename}");
+    if let Some(output) = args.output {
+        image_generator::save_to_file(&image_data, &output)?;
+        println!("✅ Screenshot saved to {output}");
+    }
 
     Ok(())
 }
@@ -104,10 +116,13 @@ mod tests {
     fn test_execute_command_with_file() {
         let args = Args {
             command: vec!["echo".into(), "hello".into()],
+            quiet: false,
             no_decoration: false,
             decoration: WindowDecorationType::Classic,
-            filename: Some("test.png".into()),
+            output: Some("test.png".into()),
             clipboard: false,
+            width: Dimension::Auto,
+            height: Dimension::Auto,
         };
 
         let result = run_shellshot(args);
