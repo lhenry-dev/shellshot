@@ -1,8 +1,12 @@
-use crate::image_renderer::{render_size::calculate_char_size, ImageRendererError};
+use crate::image_renderer::{
+    render_size::{calculate_char_size, Size},
+    ImageRendererError,
+};
 use ab_glyph::{FontArc, PxScale};
 use image::{Rgba, RgbaImage};
 use imageproc::drawing::draw_text_mut;
-use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Rect, Size, Transform};
+use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Rect, Transform};
+use tracing::warn;
 
 bitflags::bitflags! {
     pub struct Corners: u8 {
@@ -121,7 +125,10 @@ impl Canvas {
             pb.line_to(x, y);
         }
 
-        let path = pb.finish().unwrap();
+        let Some(path) = pb.finish() else {
+            warn!("Failed to build rounded rect path");
+            return;
+        };
 
         let mut paint = Paint::default();
         paint.set_color(Color::from_rgba8(color[0], color[1], color[2], color[3]));
@@ -188,11 +195,11 @@ impl Canvas {
     }
 
     pub fn char_width(&self) -> u32 {
-        self.char_size.width() as u32
+        self.char_size.width
     }
 
     pub fn char_height(&self) -> u32 {
-        self.char_size.height() as u32
+        self.char_size.height
     }
 
     pub fn to_final_image(&self) -> Result<RgbaImage, ImageRendererError> {

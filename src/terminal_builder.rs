@@ -1,8 +1,10 @@
-use anyhow::Result;
-use std::io::BufRead;
+use std::io::{self, BufRead, Write};
 use termwiz::color::ColorAttribute;
 use termwiz::escape::parser::Parser;
+use termwiz::escape::Action;
 use termwiz::surface::Surface;
+use thiserror::Error;
+use tracing::trace;
 
 use crate::constants::{MAX_HEIGHT, MAX_WIDTH};
 use crate::pty_executor::dimension::Dimension;
@@ -12,13 +14,23 @@ use crate::terminal_builder::action::process_action;
 mod action;
 mod utils;
 
+#[derive(Debug, Error)]
+pub enum TerminalBuilderError {
+    #[error("IO error: {0}")]
+    IoError(#[from] io::Error),
+}
+
 pub struct TerminalBuilder {
     pty_process: PtyIO,
     surface: Surface,
 }
 
 impl TerminalBuilder {
-    pub fn run(pty_process: PtyIO, cols: &Dimension, rows: &Dimension) -> Result<Surface> {
+    pub fn run(
+        pty_process: PtyIO,
+        cols: &Dimension,
+        rows: &Dimension,
+    ) -> Result<Surface, TerminalBuilderError> {
         let mut terminal = Self {
             pty_process,
             surface: Surface::new(
@@ -27,7 +39,7 @@ impl TerminalBuilder {
             ),
         };
 
-        terminal.run_loop().unwrap();
+        terminal.run_loop()?;
         match (rows, cols) {
             (Dimension::Auto, Dimension::Auto) => terminal.resize_surface(true, true),
             (Dimension::Auto, Dimension::Value(_)) => terminal.resize_surface(true, false),
@@ -38,7 +50,7 @@ impl TerminalBuilder {
         Ok(terminal.surface.clone())
     }
 
-    fn run_loop(&mut self) -> Result<Surface> {
+    fn run_loop(&mut self) -> Result<Surface, TerminalBuilderError> {
         let reader = &mut self.pty_process.reader;
         let writer = &mut self.pty_process.writer;
         let surface = &mut self.surface;
@@ -46,7 +58,7 @@ impl TerminalBuilder {
         let mut parser = Parser::new();
 
         loop {
-            let buf = reader.fill_buf().expect("error reading PTY");
+            let buf = reader.fill_buf()?;
             if buf.is_empty() {
                 break;
             }
@@ -55,7 +67,11 @@ impl TerminalBuilder {
             parser.parse(buf, |action| action.append_to(&mut actions));
 
             for action in actions {
-                let seq = process_action(surface, writer, action);
+                if let Action::PrintString(s) = &action {
+                    trace!("Currently parsing: {}", s);
+                    io::stdout().flush()?;
+                }
+                let seq = process_action(surface, writer, &action);
                 surface.flush_changes_older_than(seq);
             }
 

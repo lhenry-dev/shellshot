@@ -1,9 +1,6 @@
-use std::{
-    io, mem,
-    sync::{
-        mpsc::{channel, Sender},
-        Arc, Mutex,
-    },
+use std::sync::{
+    mpsc::{channel, Sender},
+    Arc, Mutex, MutexGuard,
 };
 
 #[derive(Clone)]
@@ -59,35 +56,43 @@ impl std::io::Write for ThreadedWriter {
 
 #[derive(Clone)]
 pub struct DetachableWriter {
-    inner: Arc<Mutex<Box<dyn io::Write + Send>>>,
+    inner: Arc<Mutex<Box<dyn std::io::Write + Send>>>,
 }
 
 impl DetachableWriter {
-    /// Creates a new detachable writer.
-    pub fn new(writer: Box<dyn io::Write + Send>) -> Self {
+    pub fn new(writer: Box<dyn std::io::Write + Send>) -> Self {
         Self {
             inner: Arc::new(Mutex::new(writer)),
         }
     }
 
-    /// Detaches the current writer and replaces it with a sink.
-    pub fn detach(&self) -> Box<dyn io::Write + Send> {
-        self.replace(Box::new(io::sink()))
+    pub fn detach(&self) -> std::io::Result<Box<dyn std::io::Write + Send>> {
+        self.replace(Box::new(std::io::sink()))
     }
 
-    /// Replaces the current writer with a new one.
-    fn replace(&self, writer: Box<dyn io::Write + Send>) -> Box<dyn io::Write + Send> {
-        let mut inner = self.inner.lock().unwrap();
-        mem::replace(&mut inner, writer)
+    fn replace(
+        &self,
+        writer: Box<dyn std::io::Write + Send>,
+    ) -> std::io::Result<Box<dyn std::io::Write + Send>> {
+        let mut inner = self.lock_inner()?;
+        Ok(std::mem::replace(&mut inner, writer))
+    }
+
+    fn lock_inner(&self) -> Result<MutexGuard<'_, Box<dyn std::io::Write + Send>>, std::io::Error> {
+        self.inner
+            .lock()
+            .map_err(|e| std::io::Error::other(format!("Mutex poisoned: {}", e)))
     }
 }
 
-impl io::Write for DetachableWriter {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.inner.lock().unwrap().write(buf)
+impl std::io::Write for DetachableWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let mut inner = self.lock_inner()?;
+        inner.write(buf)
     }
 
-    fn flush(&mut self) -> io::Result<()> {
-        self.inner.lock().unwrap().flush()
+    fn flush(&mut self) -> std::io::Result<()> {
+        let mut inner = self.lock_inner()?;
+        inner.flush()
     }
 }

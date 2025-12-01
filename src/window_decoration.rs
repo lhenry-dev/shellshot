@@ -1,10 +1,10 @@
 use crate::{
-    image_renderer::{canvas::Canvas, ImageRendererError},
+    image_renderer::{canvas::Canvas, render_size::Size, ImageRendererError},
     window_decoration::no_decoration::NoDecoration,
 };
 
 mod classic;
-mod communs;
+mod common;
 mod no_decoration;
 
 use ab_glyph::FontArc;
@@ -12,7 +12,6 @@ use clap::ValueEnum;
 pub use classic::Classic;
 use image::Rgba;
 use termwiz::cell::Cell;
-use tiny_skia::Size;
 
 /// Type of window decoration to apply around the rendered content
 #[derive(Clone, Debug, ValueEnum)]

@@ -1,21 +1,24 @@
 use clap::{ArgGroup, Parser};
 use thiserror::Error;
+use tracing::info;
 
 use crate::{
     image_generator::{self, SaveError},
     image_renderer::{ImageRenderer, ImageRendererError},
-    pty_executor::{dimension::Dimension, PtyExecutor, PtyOptions},
+    pty_executor::{dimension::Dimension, PtyExecutor, PtyExecutorError, PtyOptions},
+    terminal_builder::TerminalBuilderError,
     window_decoration::{create_window_decoration, WindowDecorationType},
 };
 
 /// Errors that can occur in `shellshot`
 #[derive(Error, Debug)]
 pub enum ShellshotError {
-    // #[error("Failed to execute command: {0}")]
-    // CommandExecution(#[from] ExecutorError),
+    #[error("Failed to execute command: {0}")]
+    CommandExecution(#[from] PtyExecutorError),
 
-    // #[error("Failed to build screen from output: {0}")]
-    // ScreenBuild(#[from] ScreenBuilderError),
+    #[error("Failed to build terminal from output: {0}")]
+    TerminalBuild(#[from] TerminalBuilderError),
+
     #[error("Failed to render image: {0}")]
     ImageRender(#[from] ImageRendererError),
 
@@ -79,16 +82,14 @@ pub struct Args {
 /// - Image rendering fails
 /// - Saving the image fails
 pub fn run_shellshot(args: Args) -> Result<(), ShellshotError> {
-    println!("Starting shellshot v{}", env!("CARGO_PKG_VERSION"));
-
-    println!("Executing command: {:?}", args.command);
+    info!("Starting shellshot v{}", env!("CARGO_PKG_VERSION"));
 
     let pty_options = PtyOptions {
         cols: args.width,
         rows: args.height,
     };
 
-    let screen = PtyExecutor::run_command(&pty_options, &args.command).unwrap();
+    let screen = PtyExecutor::run_command(&pty_options, &args.command)?;
 
     let decoration = (!args.no_decoration).then_some(args.decoration);
     let window_decoration = create_window_decoration(decoration.as_ref());
@@ -97,12 +98,12 @@ pub fn run_shellshot(args: Args) -> Result<(), ShellshotError> {
 
     if args.clipboard {
         image_generator::save_to_clipboard(&image_data)?;
-        println!("✅ Screenshot saved to clipboard");
+        info!("✅ Screenshot saved to clipboard");
     }
 
     if let Some(output) = args.output {
         image_generator::save_to_file(&image_data, &output)?;
-        println!("✅ Screenshot saved to {output}");
+        info!("✅ Screenshot saved to {output}");
     }
 
     Ok(())

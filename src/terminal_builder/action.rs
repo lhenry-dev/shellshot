@@ -4,6 +4,7 @@ use termwiz::{
     escape::Action,
     surface::{SequenceNo, Surface, SEQ_ZERO},
 };
+use tracing::debug;
 
 use crate::terminal_builder::action::{
     control::process_control,
@@ -20,9 +21,9 @@ mod print;
 pub fn process_action(
     surface: &mut Surface,
     writer: &mut dyn io::Write,
-    action: Action,
+    action: &Action,
 ) -> SequenceNo {
-    println!("Processing action: {:?}", action);
+    debug!("Processing action: {:?}", action);
 
     match action {
         Action::Print(ch) => process_print(surface, ch),
@@ -30,7 +31,7 @@ pub fn process_action(
         Action::Control(control_code) => process_control(surface, control_code),
         Action::DeviceControl(_device_control_mode) => SEQ_ZERO,
         Action::OperatingSystemCommand(operating_system_command) => {
-            process_operating_system_command(surface, writer, *operating_system_command)
+            process_operating_system_command(surface, writer, operating_system_command)
         }
         Action::CSI(csi) => process_csi(surface, writer, csi),
         Action::Esc(_esc) => SEQ_ZERO,

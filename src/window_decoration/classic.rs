@@ -1,16 +1,16 @@
 use ab_glyph::FontArc;
 use image::Rgba;
 use termwiz::cell::Cell;
-use tiny_skia::Size;
 
 use crate::image_renderer::canvas::Canvas;
 use crate::image_renderer::canvas::Corners;
+use crate::image_renderer::render_size::Size;
 use crate::image_renderer::ImageRendererError;
-use crate::window_decoration::communs::default_build_command_line;
-use crate::window_decoration::communs::default_font;
-use crate::window_decoration::communs::get_default_color_palette;
-use crate::window_decoration::communs::DEFAULT_BG_COLOR;
-use crate::window_decoration::communs::DEFAULT_FG_COLOR;
+use crate::window_decoration::common::default_build_command_line;
+use crate::window_decoration::common::default_font;
+use crate::window_decoration::common::get_default_color_palette;
+use crate::window_decoration::common::DEFAULT_BG_COLOR;
+use crate::window_decoration::common::DEFAULT_FG_COLOR;
 use crate::window_decoration::WindowMetrics;
 
 use super::WindowDecoration;
@@ -30,7 +30,7 @@ impl WindowDecoration for Classic {
     }
 
     fn compute_metrics(&self, char_size: Size) -> WindowMetrics {
-        let char_height = char_size.height() as u32;
+        let char_height = char_size.height;
 
         let padding = char_height;
         let border_width = 0;

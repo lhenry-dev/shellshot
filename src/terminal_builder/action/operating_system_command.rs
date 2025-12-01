@@ -14,22 +14,21 @@ use termwiz::{
 pub fn process_operating_system_command(
     surface: &mut Surface,
     writer: &mut dyn io::Write,
-    operating_system_command: OperatingSystemCommand,
+    operating_system_command: &OperatingSystemCommand,
 ) -> SequenceNo {
     match operating_system_command {
         OperatingSystemCommand::ChangeDynamicColors(dynamic_color_number, items) => {
-            process_change_dynamic_colors(surface, writer, dynamic_color_number, items)
+            process_change_dynamic_colors(surface, writer, dynamic_color_number, items.to_vec())
         }
         OperatingSystemCommand::ResetDynamicColor(dynamic_color_number) => {
             process_reset_dynamic_color(surface, dynamic_color_number)
         }
         OperatingSystemCommand::ResetColors(items) => {
-            items
-                .into_iter()
-                .filter_map(FromPrimitive::from_u8)
-                .for_each(|color| {
+            for byte in items {
+                if let Some(color) = &FromPrimitive::from_u8(*byte) {
                     process_reset_dynamic_color(surface, color);
-                });
+                }
+            }
 
             SEQ_ZERO
         }
@@ -56,14 +55,14 @@ pub fn process_operating_system_command(
 fn process_change_dynamic_colors(
     surface: &mut Surface,
     writer: &mut dyn io::Write,
-    first_color: DynamicColorNumber,
+    first_color: &DynamicColorNumber,
     colors: Vec<ColorOrQuery>,
 ) -> SequenceNo {
     colors
         .into_iter()
         .enumerate()
         .filter_map(|(i, c)| {
-            let idx = first_color as u8 + i as u8;
+            let idx = *first_color as u8 + i as u8;
             FromPrimitive::from_u8(idx).map(|dc| (dc, c))
         })
         .for_each(|(target, color)| match target {
@@ -86,9 +85,9 @@ fn process_change_dynamic_colors(
 
 fn process_reset_dynamic_color(
     surface: &mut Surface,
-    dynamic_color_number: DynamicColorNumber,
+    dynamic_color_number: &DynamicColorNumber,
 ) -> SequenceNo {
-    let idx: u8 = dynamic_color_number as u8;
+    let idx: u8 = *dynamic_color_number as u8;
 
     if let Some(which_color) = FromPrimitive::from_u8(idx) {
         match which_color {

@@ -2,6 +2,7 @@ use ab_glyph::PxScale;
 use image::RgbaImage;
 use termwiz::surface::Surface;
 use thiserror::Error;
+use tracing::info;
 use unicode_width::UnicodeWidthChar;
 
 use crate::constants::{FONT_SIZE, QUALITY_MULTIPLIER};
@@ -78,12 +79,7 @@ impl ImageRenderer {
 
         let metrics = window_decoration.compute_metrics(char_size);
         let image_size = calculate_image_size(&command_line, screen, &metrics, char_size);
-        let canvas = Canvas::new(
-            image_size.width() as u32,
-            image_size.height() as u32,
-            font.clone(),
-            scale,
-        )?;
+        let canvas = Canvas::new(image_size.width, image_size.height, font.clone(), scale)?;
 
         Ok(Self {
             canvas,
@@ -104,7 +100,7 @@ impl ImageRenderer {
 
         self.draw_terminal_content(screen)?;
 
-        println!("Finalizing image rendering...");
+        info!("Rendering final screenshot...");
 
         let final_image = self.canvas.to_final_image()?;
 

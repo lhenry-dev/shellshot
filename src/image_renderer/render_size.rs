@@ -1,18 +1,26 @@
 use ab_glyph::{Font, FontArc, PxScale, ScaleFont};
 use termwiz::{cell::Cell, surface::Surface};
-use tiny_skia::Size;
 
 use crate::window_decoration::WindowMetrics;
+
+#[derive(Debug, Clone, Copy)]
+pub struct Size {
+    pub width: u32,
+    pub height: u32,
+}
 
 pub fn calculate_char_size(font: &FontArc, scale: PxScale) -> Size {
     let glyph_id = font.glyph_id('M');
     let scaled_font = font.as_scaled(scale);
-    let char_width = scaled_font.h_advance(glyph_id).ceil();
+    let char_width = scaled_font.h_advance(glyph_id).ceil() as u32;
 
     let scaled_font = font.as_scaled(scale);
-    let char_height = (scaled_font.height() + scaled_font.line_gap()).ceil();
+    let char_height = (scaled_font.height() + scaled_font.line_gap()).ceil() as u32;
 
-    Size::from_wh(char_width, char_height).unwrap()
+    Size {
+        width: char_width,
+        height: char_height,
+    }
 }
 
 pub fn calculate_image_size(
@@ -21,8 +29,8 @@ pub fn calculate_image_size(
     metrics: &WindowMetrics,
     char_size: Size,
 ) -> Size {
-    let char_width = char_size.width() as u32;
-    let char_height = char_size.height() as u32;
+    let char_width = char_size.width;
+    let char_height = char_size.height;
     let padding = 2 * metrics.padding;
     let border = 2 * metrics.border_width;
 
@@ -41,5 +49,8 @@ pub fn calculate_image_size(
     content_width = content_width.max(command_line_width);
     content_height += char_height;
 
-    Size::from_wh(content_width as f32, content_height as f32).unwrap()
+    Size {
+        width: content_width,
+        height: content_height,
+    }
 }
