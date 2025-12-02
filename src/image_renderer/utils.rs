@@ -2,7 +2,7 @@ use image::Rgba;
 use termwiz::color::ColorAttribute;
 
 pub fn resolve_rgba_with_palette(
-    color_palette: [Rgba<u8>; 256],
+    color_palette: &[Rgba<u8>; 256],
     attr: ColorAttribute,
 ) -> Option<Rgba<u8>> {
     match attr {
@@ -40,7 +40,7 @@ mod tests {
     #[test]
     fn test_default_returns_none() {
         let palette = sample_palette();
-        let result = resolve_rgba_with_palette(palette, ColorAttribute::Default);
+        let result = resolve_rgba_with_palette(&palette, ColorAttribute::Default);
         assert!(result.is_none());
     }
 
@@ -50,7 +50,7 @@ mod tests {
 
         let c: (f32, f32, f32, f32) = (0.5, 0.25, 1.0, 0.75);
         let result = resolve_rgba_with_palette(
-            palette,
+            &palette,
             ColorAttribute::TrueColorWithDefaultFallback(c.into()),
         );
 
@@ -72,7 +72,7 @@ mod tests {
         let c: (f32, f32, f32, f32) = (0.1, 0.2, 0.3, 0.4);
         let fallback_index = 42;
         let result = resolve_rgba_with_palette(
-            palette,
+            &palette,
             ColorAttribute::TrueColorWithPaletteFallback(c.into(), fallback_index),
         );
 
@@ -94,7 +94,7 @@ mod tests {
         for idx in 256..260 {
             let expected = palette[idx % 256];
             let result =
-                resolve_rgba_with_palette(palette, ColorAttribute::PaletteIndex(idx as u8));
+                resolve_rgba_with_palette(&palette, ColorAttribute::PaletteIndex(idx as u8));
             assert_eq!(result, Some(expected));
         }
     }
@@ -105,7 +105,7 @@ mod tests {
 
         let c: (f32, f32, f32, f32) = (0.0, 1.0, 0.0, 1.0);
         let result = resolve_rgba_with_palette(
-            palette,
+            &palette,
             ColorAttribute::TrueColorWithDefaultFallback(c.into()),
         );
         assert_eq!(result, Some(Rgba([0, 255, 0, 255])));

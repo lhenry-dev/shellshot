@@ -26,9 +26,9 @@ pub fn process_action(
     debug!("Processing action: {:?}", action);
 
     match action {
-        Action::Print(ch) => process_print(surface, ch),
+        Action::Print(ch) => process_print(surface, *ch),
         Action::PrintString(str) => process_print_string(surface, str),
-        Action::Control(control_code) => process_control(surface, control_code),
+        Action::Control(control_code) => process_control(surface, *control_code),
         Action::DeviceControl(_device_control_mode) => SEQ_ZERO,
         Action::OperatingSystemCommand(operating_system_command) => {
             process_operating_system_command(surface, writer, operating_system_command)

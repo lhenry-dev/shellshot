@@ -3,7 +3,6 @@ use std::{
     sync::Mutex,
 };
 
-use once_cell::sync::Lazy;
 use termwiz::{
     escape::{csi::Cursor, OneBased, CSI},
     surface::{Change, Position, SequenceNo, Surface, SEQ_ZERO},
@@ -12,7 +11,8 @@ use tracing::warn;
 
 use crate::terminal_builder::utils::{tabulate, tabulate_back};
 
-static SAVED_POSITIONS: Lazy<Mutex<Vec<(usize, usize)>>> = Lazy::new(|| Mutex::new(Vec::new()));
+static SAVED_POSITIONS: std::sync::LazyLock<Mutex<Vec<(usize, usize)>>> =
+    std::sync::LazyLock::new(|| Mutex::new(Vec::new()));
 
 pub fn process_cursor(
     surface: &mut Surface,
@@ -28,55 +28,45 @@ pub fn process_cursor(
             x: Position::Absolute(tabulate(surface.cursor_position().0, *n as usize)),
             y: Position::Relative(0),
         }),
-        Cursor::CharacterAbsolute(n) => surface.add_change(Change::CursorPosition {
-            x: Position::Absolute(n.as_zero_based() as usize),
-            y: Position::Relative(0),
-        }),
+        Cursor::CharacterAbsolute(n) | Cursor::CharacterPositionAbsolute(n) => {
+            surface.add_change(Change::CursorPosition {
+                x: Position::Absolute(n.as_zero_based() as usize),
+                y: Position::Relative(0),
+            })
+        }
         Cursor::CharacterAndLinePosition { line, col } => {
             surface.add_change(Change::CursorPosition {
                 x: Position::Absolute(col.as_zero_based() as usize),
                 y: Position::Absolute(line.as_zero_based() as usize),
             })
         }
-        Cursor::CharacterPositionForward(n) => surface.add_change(Change::CursorPosition {
-            x: Position::Relative(*n as isize),
-            y: Position::Relative(0),
-        }),
-        Cursor::CharacterPositionBackward(n) => surface.add_change(Change::CursorPosition {
-            x: Position::Relative(-(*n as isize)),
-            y: Position::Relative(0),
-        }),
-        Cursor::CharacterPositionAbsolute(n) => surface.add_change(Change::CursorPosition {
-            x: Position::Absolute(n.as_zero_based() as usize),
-            y: Position::Relative(0),
-        }),
-        Cursor::LinePositionForward(n) => surface.add_change(Change::CursorPosition {
-            x: Position::Relative(0),
-            y: Position::Relative(*n as isize),
-        }),
-        Cursor::LinePositionBackward(n) => surface.add_change(Change::CursorPosition {
-            x: Position::Relative(0),
-            y: Position::Relative(-(*n as isize)),
-        }),
+        Cursor::CharacterPositionForward(n) | Cursor::Right(n) => {
+            surface.add_change(Change::CursorPosition {
+                x: Position::Relative(*n as isize),
+                y: Position::Relative(0),
+            })
+        }
+        Cursor::CharacterPositionBackward(n) | Cursor::Left(n) => {
+            surface.add_change(Change::CursorPosition {
+                x: Position::Relative(-(*n as isize)),
+                y: Position::Relative(0),
+            })
+        }
+        Cursor::LinePositionForward(n) | Cursor::Down(n) => {
+            surface.add_change(Change::CursorPosition {
+                x: Position::Relative(0),
+                y: Position::Relative(*n as isize),
+            })
+        }
+        Cursor::LinePositionBackward(n) | Cursor::Up(n) => {
+            surface.add_change(Change::CursorPosition {
+                x: Position::Relative(0),
+                y: Position::Relative(-(*n as isize)),
+            })
+        }
         Cursor::LinePositionAbsolute(n) => surface.add_change(Change::CursorPosition {
             x: Position::Absolute(0),
             y: Position::Absolute(*n as usize),
-        }),
-        Cursor::Up(n) => surface.add_change(Change::CursorPosition {
-            x: Position::Relative(0),
-            y: Position::Relative(-(*n as isize)),
-        }),
-        Cursor::Down(n) => surface.add_change(Change::CursorPosition {
-            x: Position::Relative(0),
-            y: Position::Relative(*n as isize),
-        }),
-        Cursor::Right(n) => surface.add_change(Change::CursorPosition {
-            x: Position::Relative(*n as isize),
-            y: Position::Relative(0),
-        }),
-        Cursor::Left(n) => surface.add_change(Change::CursorPosition {
-            x: Position::Relative(-(*n as isize)),
-            y: Position::Relative(0),
         }),
         Cursor::NextLine(n) => surface.add_change(Change::CursorPosition {
             x: Position::Absolute(0),
@@ -112,7 +102,8 @@ pub fn process_cursor(
                 }
                 Err(poisoned) => {
                     warn!("Mutex poisoned when restoring cursor position, using inner value");
-                    if let Some((x, y)) = poisoned.into_inner().pop() {
+                    let value = poisoned.into_inner().pop();
+                    if let Some((x, y)) = value {
                         return surface.add_change(Change::CursorPosition {
                             x: Position::Absolute(x),
                             y: Position::Absolute(y),
@@ -153,9 +144,9 @@ mod tests {
         Surface::new(80, 24)
     }
 
-    fn apply_cursor(surface: &mut Surface, cursor: CsiCursor) -> SequenceNo {
+    fn apply_cursor(surface: &mut Surface, cursor: &CsiCursor) -> SequenceNo {
         let mut writer = std::io::sink();
-        process_cursor(surface, &mut writer, &cursor)
+        process_cursor(surface, &mut writer, cursor)
     }
 
     #[test]
@@ -163,11 +154,11 @@ mod tests {
         let mut s = make_surface();
         let before = s.cursor_position();
 
-        let seq = apply_cursor(&mut s, CsiCursor::Right(5));
+        let seq = apply_cursor(&mut s, &CsiCursor::Right(5));
         let after = s.cursor_position();
 
         assert_eq!(after.1, before.1);
-        assert_eq!(after.0 as isize, before.0 as isize + 5);
+        assert_eq!(after.0, before.0 + 5);
         let _ = seq;
     }
 
@@ -180,11 +171,11 @@ mod tests {
         });
         let before = s.cursor_position();
 
-        apply_cursor(&mut s, CsiCursor::Left(3));
+        apply_cursor(&mut s, &CsiCursor::Left(3));
         let after = s.cursor_position();
 
         assert_eq!(after.1, before.1);
-        assert_eq!(after.0 as isize, before.0 as isize - 3);
+        assert_eq!(after.0, before.0 - 3);
     }
 
     #[test]
@@ -196,15 +187,15 @@ mod tests {
         });
         let before = s.cursor_position();
 
-        apply_cursor(&mut s, CsiCursor::Up(2));
+        apply_cursor(&mut s, &CsiCursor::Up(2));
         let mid = s.cursor_position();
         assert_eq!(mid.0, before.0);
-        assert_eq!(mid.1 as isize, before.1 as isize - 2);
+        assert_eq!(mid.1, before.1 - 2);
 
-        apply_cursor(&mut s, CsiCursor::Down(4));
+        apply_cursor(&mut s, &CsiCursor::Down(4));
         let after = s.cursor_position();
         assert_eq!(after.0, before.0);
-        assert_eq!(after.1 as isize, mid.1 as isize + 4);
+        assert_eq!(after.1, mid.1 + 4);
     }
 
     #[test]
@@ -217,14 +208,14 @@ mod tests {
 
         apply_cursor(
             &mut s,
-            CsiCursor::CharacterAbsolute(OneBased::from_zero_based(12)),
+            &CsiCursor::CharacterAbsolute(OneBased::from_zero_based(12)),
         );
         assert_eq!(s.cursor_position().0, 12);
 
-        apply_cursor(&mut s, CsiCursor::CharacterPositionForward(3));
+        apply_cursor(&mut s, &CsiCursor::CharacterPositionForward(3));
         assert_eq!(s.cursor_position().0, 15);
 
-        apply_cursor(&mut s, CsiCursor::CharacterPositionBackward(2));
+        apply_cursor(&mut s, &CsiCursor::CharacterPositionBackward(2));
         assert_eq!(s.cursor_position().0, 13);
     }
 
@@ -235,7 +226,7 @@ mod tests {
         let line = OneBased::from_zero_based(4);
         let col = OneBased::from_zero_based(7);
 
-        apply_cursor(&mut s, CsiCursor::CharacterAndLinePosition { line, col });
+        apply_cursor(&mut s, &CsiCursor::CharacterAndLinePosition { line, col });
 
         assert_eq!(s.cursor_position().0, 7);
         assert_eq!(s.cursor_position().1, 4);
@@ -247,7 +238,7 @@ mod tests {
         let line = OneBased::from_zero_based(2);
         let col = OneBased::from_zero_based(3);
 
-        apply_cursor(&mut s, CsiCursor::Position { line, col });
+        apply_cursor(&mut s, &CsiCursor::Position { line, col });
 
         assert_eq!(s.cursor_position(), (3, 2));
     }
@@ -261,12 +252,12 @@ mod tests {
             y: Position::Absolute(2),
         });
 
-        apply_cursor(&mut s, CsiCursor::NextLine(1));
+        apply_cursor(&mut s, &CsiCursor::NextLine(1));
         let (x1, y1) = s.cursor_position();
         assert_eq!(x1, 0);
         assert_eq!(y1, 3);
 
-        apply_cursor(&mut s, CsiCursor::PrecedingLine(2));
+        apply_cursor(&mut s, &CsiCursor::PrecedingLine(2));
         let (x2, y2) = s.cursor_position();
         assert_eq!(x2, 0);
         assert_eq!(y2, 1);
@@ -278,7 +269,7 @@ mod tests {
 
         apply_cursor(
             &mut s,
-            CsiCursor::CharacterAndLinePosition {
+            &CsiCursor::CharacterAndLinePosition {
                 line: OneBased::from_zero_based(10),
                 col: OneBased::from_zero_based(20),
             },
@@ -298,17 +289,17 @@ mod tests {
             y: Position::Absolute(4),
         });
 
-        apply_cursor(&mut s, CsiCursor::SaveCursor);
-        apply_cursor(&mut s, CsiCursor::Right(4));
-        apply_cursor(&mut s, CsiCursor::SaveCursor);
-        apply_cursor(&mut s, CsiCursor::Down(2));
+        apply_cursor(&mut s, &CsiCursor::SaveCursor);
+        apply_cursor(&mut s, &CsiCursor::Right(4));
+        apply_cursor(&mut s, &CsiCursor::SaveCursor);
+        apply_cursor(&mut s, &CsiCursor::Down(2));
 
-        apply_cursor(&mut s, CsiCursor::RestoreCursor);
+        apply_cursor(&mut s, &CsiCursor::RestoreCursor);
         let (x1, y1) = s.cursor_position();
         assert!(x1 > 0);
         assert!(y1 > 0);
 
-        apply_cursor(&mut s, CsiCursor::RestoreCursor);
+        apply_cursor(&mut s, &CsiCursor::RestoreCursor);
         let (x2, y2) = s.cursor_position();
         assert!(x2 > 0);
         assert!(y2 > 0);
@@ -339,11 +330,11 @@ mod tests {
             y: Position::Absolute(0),
         });
 
-        apply_cursor(&mut s, CsiCursor::ForwardTabulation(1));
+        apply_cursor(&mut s, &CsiCursor::ForwardTabulation(1));
         let (x_after, _) = s.cursor_position();
         assert!(x_after > 0);
 
-        apply_cursor(&mut s, CsiCursor::BackwardTabulation(1));
+        apply_cursor(&mut s, &CsiCursor::BackwardTabulation(1));
         let (x_after2, _) = s.cursor_position();
         assert!(x_after2 > 0);
     }
@@ -353,22 +344,22 @@ mod tests {
         let mut s = make_surface();
         let initial = s.cursor_position();
 
-        apply_cursor(&mut s, CsiCursor::Right(5));
+        apply_cursor(&mut s, &CsiCursor::Right(5));
         let (x, y) = s.cursor_position();
         assert_eq!(y, initial.1);
-        assert_eq!(x as isize, initial.0 as isize + 5);
+        assert_eq!(x, initial.0 + 5);
 
-        apply_cursor(&mut s, CsiCursor::Left(3));
+        apply_cursor(&mut s, &CsiCursor::Left(3));
         let (x2, _) = s.cursor_position();
-        assert_eq!(x2 as isize, x as isize - 3);
+        assert_eq!(x2, x - 3);
 
-        apply_cursor(&mut s, CsiCursor::Down(4));
+        apply_cursor(&mut s, &CsiCursor::Down(4));
         let (_, y2) = s.cursor_position();
-        assert_eq!(y2 as isize, initial.1 as isize + 4);
+        assert_eq!(y2, initial.1 + 4);
 
-        apply_cursor(&mut s, CsiCursor::Up(2));
+        apply_cursor(&mut s, &CsiCursor::Up(2));
         let (_, y3) = s.cursor_position();
-        assert_eq!(y3 as isize, y2 as isize - 2);
+        assert_eq!(y3, y2 - 2);
     }
 
     #[test]
@@ -377,16 +368,16 @@ mod tests {
 
         apply_cursor(
             &mut s,
-            CsiCursor::CharacterAbsolute(OneBased::from_zero_based(10)),
+            &CsiCursor::CharacterAbsolute(OneBased::from_zero_based(10)),
         );
         assert_eq!(s.cursor_position().0, 10);
 
-        apply_cursor(&mut s, CsiCursor::LinePositionAbsolute(5));
+        apply_cursor(&mut s, &CsiCursor::LinePositionAbsolute(5));
         assert_eq!(s.cursor_position().1, 5);
 
         apply_cursor(
             &mut s,
-            CsiCursor::CharacterAndLinePosition {
+            &CsiCursor::CharacterAndLinePosition {
                 line: OneBased::from_zero_based(3),
                 col: OneBased::from_zero_based(7),
             },
@@ -397,7 +388,7 @@ mod tests {
 
         apply_cursor(
             &mut s,
-            CsiCursor::Position {
+            &CsiCursor::Position {
                 line: OneBased::from_zero_based(2),
                 col: OneBased::from_zero_based(4),
             },
@@ -414,11 +405,11 @@ mod tests {
             y: Position::Absolute(0),
         });
 
-        apply_cursor(&mut s, CsiCursor::ForwardTabulation(1));
+        apply_cursor(&mut s, &CsiCursor::ForwardTabulation(1));
         let (x1, _) = s.cursor_position();
         assert!(x1 > 2);
 
-        apply_cursor(&mut s, CsiCursor::BackwardTabulation(1));
+        apply_cursor(&mut s, &CsiCursor::BackwardTabulation(1));
         let (x2, _) = s.cursor_position();
         assert!(x2 <= x1);
     }
@@ -431,12 +422,12 @@ mod tests {
             y: Position::Absolute(5),
         });
 
-        apply_cursor(&mut s, CsiCursor::NextLine(2));
+        apply_cursor(&mut s, &CsiCursor::NextLine(2));
         let (x, y) = s.cursor_position();
         assert_eq!(x, 0);
         assert_eq!(y, 7);
 
-        apply_cursor(&mut s, CsiCursor::PrecedingLine(3));
+        apply_cursor(&mut s, &CsiCursor::PrecedingLine(3));
         let (x, y) = s.cursor_position();
         assert_eq!(x, 0);
         assert_eq!(y, 4);
@@ -450,16 +441,16 @@ mod tests {
             y: Position::Absolute(3),
         });
 
-        apply_cursor(&mut s, CsiCursor::SaveCursor);
-        apply_cursor(&mut s, CsiCursor::Right(4));
-        apply_cursor(&mut s, CsiCursor::SaveCursor);
-        apply_cursor(&mut s, CsiCursor::Down(2));
+        apply_cursor(&mut s, &CsiCursor::SaveCursor);
+        apply_cursor(&mut s, &CsiCursor::Right(4));
+        apply_cursor(&mut s, &CsiCursor::SaveCursor);
+        apply_cursor(&mut s, &CsiCursor::Down(2));
 
-        apply_cursor(&mut s, CsiCursor::RestoreCursor);
+        apply_cursor(&mut s, &CsiCursor::RestoreCursor);
         let (x1, y1) = s.cursor_position();
         assert_eq!((x1, y1), (6, 3));
 
-        apply_cursor(&mut s, CsiCursor::RestoreCursor);
+        apply_cursor(&mut s, &CsiCursor::RestoreCursor);
         let (x2, y2) = s.cursor_position();
         assert_eq!((x2, y2), (2, 3));
     }
@@ -488,7 +479,7 @@ mod tests {
 
         apply_cursor(
             &mut s,
-            CsiCursor::CharacterPositionAbsolute(OneBased::from_zero_based(10)),
+            &CsiCursor::CharacterPositionAbsolute(OneBased::from_zero_based(10)),
         );
         let (x, y) = s.cursor_position();
         assert_eq!(x, 10);
@@ -503,7 +494,7 @@ mod tests {
             y: Position::Absolute(4),
         });
 
-        apply_cursor(&mut s, CsiCursor::LinePositionForward(3));
+        apply_cursor(&mut s, &CsiCursor::LinePositionForward(3));
         let (x, y) = s.cursor_position();
         assert_eq!(x, 3);
         assert_eq!(y, 7);
@@ -517,12 +508,12 @@ mod tests {
             y: Position::Absolute(2),
         });
 
-        apply_cursor(&mut s, CsiCursor::LinePositionBackward(1));
+        apply_cursor(&mut s, &CsiCursor::LinePositionBackward(1));
         let (x, y) = s.cursor_position();
         assert_eq!(x, 3);
         assert_eq!(y, 1);
 
-        apply_cursor(&mut s, CsiCursor::LinePositionBackward(5));
+        apply_cursor(&mut s, &CsiCursor::LinePositionBackward(5));
         let (x2, y2) = s.cursor_position();
         assert_eq!(x2, 3);
         assert_eq!(y2, 0);

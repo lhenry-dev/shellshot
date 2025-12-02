@@ -81,7 +81,7 @@ impl DetachableWriter {
     fn lock_inner(&self) -> Result<MutexGuard<'_, Box<dyn std::io::Write + Send>>, std::io::Error> {
         self.inner
             .lock()
-            .map_err(|e| std::io::Error::other(format!("Mutex poisoned: {}", e)))
+            .map_err(|e| std::io::Error::other(format!("Mutex poisoned: {e}")))
     }
 }
 

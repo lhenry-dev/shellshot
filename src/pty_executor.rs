@@ -138,7 +138,7 @@ impl PtyExecutor {
 
             let surface = handle
                 .join()
-                .map_err(|e| PtyExecutorError::ThreadJoinFailed(format!("{:?}", e)))??;
+                .map_err(|e| PtyExecutorError::ThreadJoinFailed(format!("{e:?}")))??;
 
             Ok(surface)
         })
@@ -175,7 +175,7 @@ mod tests {
         let surface = PtyExecutor::run_command(&options, &command).expect("Failed to run command");
 
         let text = surface.screen_chars_to_string();
-        println!("Captured output:\n{}", text);
+        println!("Captured output:\n{text}");
         assert!(text.contains("Hello World"));
     }
 
@@ -184,7 +184,7 @@ mod tests {
         let options = default_options();
 
         let ansi_str = if cfg!(windows) {
-            r#"echo ^[[31mRed^[[0m ^[[32mGreen^[[0m ^[[1mBold^[[0m"#
+            r"echo ^[[31mRed^[[0m ^[[32mGreen^[[0m ^[[1mBold^[[0m"
         } else {
             r#"echo -e "\e[31mRed\e[0m \e[32mGreen\e[0m \e[1mBold\e[0m""#
         };
@@ -195,7 +195,7 @@ mod tests {
             PtyExecutor::run_command(&options, &command).expect("Failed to run ANSI command");
 
         let text = surface.screen_chars_to_string();
-        println!("Captured ANSI output:\n{}", text);
+        println!("Captured ANSI output:\n{text}");
 
         assert!(text.contains("Red"));
         assert!(text.contains("Green"));

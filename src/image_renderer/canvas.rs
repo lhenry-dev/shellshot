@@ -52,7 +52,7 @@ impl Canvas {
             .fill(Color::from_rgba8(color[0], color[1], color[2], color[3]));
     }
 
-    pub fn fill_rounded(&mut self, color: Rgba<u8>, radius: f32, corners: Corners) {
+    pub fn fill_rounded(&mut self, color: Rgba<u8>, radius: f32, corners: &Corners) {
         self.fill_rounded_rect(
             0,
             0,
@@ -82,7 +82,7 @@ impl Canvas {
         height: u32,
         color: Rgba<u8>,
         radius: f32,
-        corners: Corners,
+        corners: &Corners,
     ) {
         let x = x as f32;
         let y = y as f32;
@@ -215,8 +215,8 @@ impl Canvas {
             let alpha = text_pixel[3] as f32 / 255.0;
             if alpha > 0.0 {
                 for i in 0..3 {
-                    final_pixel[i] = (text_pixel[i] as f32 * alpha
-                        + final_pixel[i] as f32 * (1.0 - alpha))
+                    final_pixel[i] = (text_pixel[i] as f32)
+                        .mul_add(alpha, final_pixel[i] as f32 * (1.0 - alpha))
                         as u8;
                 }
                 final_pixel[3] = 255;
@@ -242,7 +242,7 @@ mod tests {
     #[test]
     fn canvas_creation() {
         let font = make_font();
-        let c = Canvas::new(100, 50, font.clone(), 16.0.into());
+        let c = Canvas::new(100, 50, font, 16.0.into());
         assert!(c.is_ok());
         let c = c.unwrap();
         assert_eq!(c.width(), 100);
@@ -252,16 +252,16 @@ mod tests {
     #[test]
     fn fill_and_fill_rect() {
         let font = make_font();
-        let mut c = Canvas::new(50, 30, font.clone(), 12.0.into()).unwrap();
+        let mut c = Canvas::new(50, 30, font, 12.0.into()).unwrap();
         c.fill(Rgba([255, 0, 0, 255]));
         c.fill_rect(5, 5, 10, 10, Rgba([0, 255, 0, 255]));
-        c.fill_rounded(Rgba([0, 0, 255, 255]), 5.0, Corners::ALL);
+        c.fill_rounded(Rgba([0, 0, 255, 255]), 5.0, &Corners::ALL);
     }
 
     #[test]
     fn draw_shapes_and_text() {
         let font = make_font();
-        let mut c = Canvas::new(60, 40, font.clone(), 12.0.into()).unwrap();
+        let mut c = Canvas::new(60, 40, font, 12.0.into()).unwrap();
         c.draw_circle(20, 20, 10, Rgba([255, 255, 0, 255]));
         c.draw_text(
             "Hello",
@@ -275,7 +275,7 @@ mod tests {
     #[test]
     fn final_image_has_correct_dimensions() {
         let font = make_font();
-        let mut c = Canvas::new(80, 60, font.clone(), 14.0.into()).unwrap();
+        let mut c = Canvas::new(80, 60, font, 14.0.into()).unwrap();
         c.fill(Rgba([100, 100, 100, 255]));
         let img = c.to_final_image().unwrap();
         assert_eq!(img.width(), 80);

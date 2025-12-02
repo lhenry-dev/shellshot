@@ -38,7 +38,7 @@ where
 
         t.thread().unpark();
         t.join()
-            .map_err(|e| PtyExecutorError::ThreadJoinFailed(format!("{:?}", e)))?;
+            .map_err(|e| PtyExecutorError::ThreadJoinFailed(format!("{e:?}")))?;
 
         Ok(result)
     } else {
@@ -79,7 +79,7 @@ mod tests {
         }
 
         fn clone_killer(&self) -> Box<dyn ChildKiller + Send + Sync> {
-            Box::new(FakeKiller {
+            Box::new(Self {
                 killed: self.killed.clone(),
             })
         }

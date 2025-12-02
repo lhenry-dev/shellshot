@@ -18,15 +18,15 @@ pub fn process_operating_system_command(
 ) -> SequenceNo {
     match operating_system_command {
         OperatingSystemCommand::ChangeDynamicColors(dynamic_color_number, items) => {
-            process_change_dynamic_colors(surface, writer, dynamic_color_number, items.to_vec())
+            process_change_dynamic_colors(surface, writer, *dynamic_color_number, items.clone())
         }
         OperatingSystemCommand::ResetDynamicColor(dynamic_color_number) => {
-            process_reset_dynamic_color(surface, dynamic_color_number)
+            process_reset_dynamic_color(surface, *dynamic_color_number)
         }
         OperatingSystemCommand::ResetColors(items) => {
             for byte in items {
                 if let Some(color) = &FromPrimitive::from_u8(*byte) {
-                    process_reset_dynamic_color(surface, color);
+                    process_reset_dynamic_color(surface, *color);
                 }
             }
 
@@ -55,14 +55,14 @@ pub fn process_operating_system_command(
 fn process_change_dynamic_colors(
     surface: &mut Surface,
     writer: &mut dyn io::Write,
-    first_color: &DynamicColorNumber,
+    first_color: DynamicColorNumber,
     colors: Vec<ColorOrQuery>,
 ) -> SequenceNo {
     colors
         .into_iter()
         .enumerate()
         .filter_map(|(i, c)| {
-            let idx = *first_color as u8 + i as u8;
+            let idx = first_color as u8 + i as u8;
             FromPrimitive::from_u8(idx).map(|dc| (dc, c))
         })
         .for_each(|(target, color)| match target {
@@ -91,9 +91,9 @@ fn process_change_dynamic_colors(
 
 fn process_reset_dynamic_color(
     surface: &mut Surface,
-    dynamic_color_number: &DynamicColorNumber,
+    dynamic_color_number: DynamicColorNumber,
 ) -> SequenceNo {
-    let idx: u8 = *dynamic_color_number as u8;
+    let idx: u8 = dynamic_color_number as u8;
 
     if let Some(which_color) = FromPrimitive::from_u8(idx) {
         return match which_color {
@@ -147,9 +147,9 @@ mod tests {
         Surface::new(10, 1)
     }
 
-    fn apply_osc(surface: &mut Surface, osc: OperatingSystemCommand) {
+    fn apply_osc(surface: &mut Surface, osc: &OperatingSystemCommand) {
         let mut writer = std::io::sink();
-        process_operating_system_command(surface, &mut writer, &osc);
+        process_operating_system_command(surface, &mut writer, osc);
     }
 
     #[test]
@@ -159,7 +159,7 @@ mod tests {
 
         apply_osc(
             &mut s,
-            OperatingSystemCommand::ChangeDynamicColors(
+            &OperatingSystemCommand::ChangeDynamicColors(
                 DynamicColorNumber::TextForegroundColor,
                 vec![ColorOrQuery::Color(color)],
             ),
@@ -181,7 +181,7 @@ mod tests {
 
         apply_osc(
             &mut s,
-            OperatingSystemCommand::ChangeDynamicColors(
+            &OperatingSystemCommand::ChangeDynamicColors(
                 DynamicColorNumber::TextBackgroundColor,
                 vec![ColorOrQuery::Color(color)],
             ),
@@ -203,7 +203,7 @@ mod tests {
 
         apply_osc(
             &mut s,
-            OperatingSystemCommand::ChangeDynamicColors(
+            &OperatingSystemCommand::ChangeDynamicColors(
                 DynamicColorNumber::TextForegroundColor,
                 vec![ColorOrQuery::Color(color)],
             ),
@@ -211,7 +211,7 @@ mod tests {
 
         apply_osc(
             &mut s,
-            OperatingSystemCommand::ResetDynamicColor(DynamicColorNumber::TextForegroundColor),
+            &OperatingSystemCommand::ResetDynamicColor(DynamicColorNumber::TextForegroundColor),
         );
 
         s.add_change("C");
@@ -227,7 +227,7 @@ mod tests {
 
         apply_osc(
             &mut s,
-            OperatingSystemCommand::ChangeDynamicColors(
+            &OperatingSystemCommand::ChangeDynamicColors(
                 DynamicColorNumber::TextBackgroundColor,
                 vec![ColorOrQuery::Color(color)],
             ),
@@ -235,7 +235,7 @@ mod tests {
 
         apply_osc(
             &mut s,
-            OperatingSystemCommand::ResetDynamicColor(DynamicColorNumber::TextBackgroundColor),
+            &OperatingSystemCommand::ResetDynamicColor(DynamicColorNumber::TextBackgroundColor),
         );
 
         s.add_change("D");
@@ -251,7 +251,7 @@ mod tests {
 
         apply_osc(
             &mut s,
-            OperatingSystemCommand::ChangeDynamicColors(
+            &OperatingSystemCommand::ChangeDynamicColors(
                 DynamicColorNumber::TextBackgroundColor,
                 vec![ColorOrQuery::Color(color)],
             ),
@@ -259,7 +259,7 @@ mod tests {
 
         apply_osc(
             &mut s,
-            OperatingSystemCommand::ResetColors(vec![
+            &OperatingSystemCommand::ResetColors(vec![
                 DynamicColorNumber::TextForegroundColor as u8,
                 DynamicColorNumber::TextBackgroundColor as u8,
             ]),
@@ -278,7 +278,7 @@ mod tests {
 
         apply_osc(
             &mut s,
-            OperatingSystemCommand::ChangeDynamicColors(
+            &OperatingSystemCommand::ChangeDynamicColors(
                 DynamicColorNumber::TextForegroundColor,
                 vec![ColorOrQuery::Query],
             ),

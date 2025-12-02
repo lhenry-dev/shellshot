@@ -1,12 +1,12 @@
 use termwiz::{
-    cell::AttributeChange,
+    cell::{AttributeChange, CellAttributes},
     escape::csi::Sgr,
     surface::{Change, SequenceNo, Surface, SEQ_ZERO},
 };
 
 pub fn process_sgr(surface: &mut Surface, sgr: &Sgr) -> SequenceNo {
     match sgr {
-        Sgr::Reset => surface.add_change(Change::AllAttributes(Default::default())),
+        Sgr::Reset => surface.add_change(Change::AllAttributes(CellAttributes::default())),
         Sgr::Intensity(intensity) => {
             surface.add_change(Change::Attribute(AttributeChange::Intensity(*intensity)))
         }
@@ -51,14 +51,14 @@ mod tests {
         Surface::new(80, 24)
     }
 
-    fn apply_sgr(surface: &mut Surface, sgr: Sgr) {
-        process_sgr(surface, &sgr);
+    fn apply_sgr(surface: &mut Surface, sgr: &Sgr) {
+        process_sgr(surface, sgr);
     }
 
     #[test]
     fn sgr_reset() {
         let mut s = make_surface();
-        apply_sgr(&mut s, Sgr::Reset);
+        apply_sgr(&mut s, &Sgr::Reset);
 
         s.add_change("A");
         let screen = s.screen_cells();
@@ -72,7 +72,7 @@ mod tests {
     #[test]
     fn sgr_intensity() {
         let mut s = make_surface();
-        apply_sgr(&mut s, Sgr::Intensity(Intensity::Bold));
+        apply_sgr(&mut s, &Sgr::Intensity(Intensity::Bold));
 
         s.add_change("B");
         let screen = s.screen_cells();
@@ -84,20 +84,20 @@ mod tests {
     #[test]
     fn sgr_underline() {
         let mut s = make_surface();
-        apply_sgr(&mut s, Sgr::Underline(Underline::Single));
+        apply_sgr(&mut s, &Sgr::Underline(Underline::Single));
 
         s.add_change("C");
         let screen = s.screen_cells();
         let first_cell = &screen[0][0];
         assert_eq!(first_cell.attrs().underline(), Underline::Single);
 
-        apply_sgr(&mut s, Sgr::Underline(Underline::Double));
+        apply_sgr(&mut s, &Sgr::Underline(Underline::Double));
         s.add_change("D");
         let screen = s.screen_cells();
         let second_cell = &screen[0][1];
         assert_eq!(second_cell.attrs().underline(), Underline::Double);
 
-        apply_sgr(&mut s, Sgr::Underline(Underline::None));
+        apply_sgr(&mut s, &Sgr::Underline(Underline::None));
         s.add_change("E");
         let screen = s.screen_cells();
         let third_cell = &screen[0][2];
@@ -107,14 +107,14 @@ mod tests {
     #[test]
     fn sgr_inverse() {
         let mut s = make_surface();
-        apply_sgr(&mut s, Sgr::Inverse(true));
+        apply_sgr(&mut s, &Sgr::Inverse(true));
 
         s.add_change("F");
         let screen = s.screen_cells();
         let first_cell = &screen[0][0];
         assert!(first_cell.attrs().reverse());
 
-        apply_sgr(&mut s, Sgr::Inverse(false));
+        apply_sgr(&mut s, &Sgr::Inverse(false));
         s.add_change("G");
         let screen = s.screen_cells();
         let second_cell = &screen[0][1];
@@ -124,7 +124,7 @@ mod tests {
     #[test]
     fn sgr_italic() {
         let mut s = make_surface();
-        apply_sgr(&mut s, Sgr::Italic(true));
+        apply_sgr(&mut s, &Sgr::Italic(true));
 
         s.add_change("H");
         let screen = s.screen_cells();
@@ -135,7 +135,7 @@ mod tests {
     #[test]
     fn sgr_strikethrough() {
         let mut s = make_surface();
-        apply_sgr(&mut s, Sgr::StrikeThrough(true));
+        apply_sgr(&mut s, &Sgr::StrikeThrough(true));
 
         s.add_change("I");
         let screen = s.screen_cells();
@@ -146,7 +146,7 @@ mod tests {
     #[test]
     fn sgr_invisible() {
         let mut s = make_surface();
-        apply_sgr(&mut s, Sgr::Invisible(true));
+        apply_sgr(&mut s, &Sgr::Invisible(true));
 
         s.add_change("J");
         let screen = s.screen_cells();
@@ -157,7 +157,7 @@ mod tests {
     #[test]
     fn sgr_foreground_background() {
         let mut s = make_surface();
-        apply_sgr(&mut s, Sgr::Foreground(ColorSpec::PaletteIndex(120)));
+        apply_sgr(&mut s, &Sgr::Foreground(ColorSpec::PaletteIndex(120)));
 
         s.add_change("K");
         let screen = s.screen_cells();
@@ -167,7 +167,7 @@ mod tests {
             ColorAttribute::PaletteIndex(120)
         );
 
-        apply_sgr(&mut s, Sgr::Background(ColorSpec::Default));
+        apply_sgr(&mut s, &Sgr::Background(ColorSpec::Default));
         s.add_change("L");
         let screen = s.screen_cells();
         let second_cell = &screen[0][1];
@@ -178,7 +178,7 @@ mod tests {
     fn sgr_foreground_truecolor() {
         let mut s = make_surface();
         let color = SrgbaTuple(1.0, 0.0, 0.0, 1.0);
-        apply_sgr(&mut s, Sgr::Foreground(ColorSpec::TrueColor(color)));
+        apply_sgr(&mut s, &Sgr::Foreground(ColorSpec::TrueColor(color)));
 
         s.add_change("M");
         let screen = s.screen_cells();

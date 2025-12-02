@@ -27,8 +27,6 @@ pub fn process_csi(surface: &mut Surface, writer: &mut dyn io::Write, csi: &CSI)
 
 fn process_edit(surface: &mut Surface, edit: &Edit) -> SequenceNo {
     match edit {
-        Edit::DeleteCharacter(_) => SEQ_ZERO,
-        Edit::DeleteLine(_) => SEQ_ZERO,
         Edit::EraseCharacter(n) => {
             let (x, y) = surface.cursor_position();
             let new_x = x.saturating_sub(*n as usize);
@@ -38,13 +36,15 @@ fn process_edit(surface: &mut Surface, edit: &Edit) -> SequenceNo {
             });
             surface.add_change(Change::Text(" ".repeat(*n as usize)))
         }
-        Edit::EraseInLine(_) => SEQ_ZERO,
-        Edit::InsertCharacter(_) => SEQ_ZERO,
-        Edit::InsertLine(_) => SEQ_ZERO,
-        Edit::ScrollDown(_) => SEQ_ZERO,
-        Edit::ScrollUp(_) => SEQ_ZERO,
-        Edit::EraseInDisplay(_) => SEQ_ZERO,
-        Edit::Repeat(_) => SEQ_ZERO,
+        Edit::EraseInLine(_)
+        | Edit::InsertCharacter(_)
+        | Edit::InsertLine(_)
+        | Edit::ScrollDown(_)
+        | Edit::ScrollUp(_)
+        | Edit::EraseInDisplay(_)
+        | Edit::Repeat(_)
+        | Edit::DeleteCharacter(_)
+        | Edit::DeleteLine(_) => SEQ_ZERO,
     }
 }
 

@@ -104,8 +104,7 @@ impl TerminalBuilder {
             lines
                 .iter()
                 .rposition(|line| !line.is_whitespace())
-                .map(|idx| idx + 1)
-                .unwrap_or(0)
+                .map_or(0, |idx| idx + 1)
         } else {
             current_rows
         };
@@ -149,9 +148,8 @@ mod tests {
         let first_line: String = surface.screen_lines()[0]
             .visible_cells()
             .map(|c| c.str().to_string())
-            .collect::<Vec<_>>()
-            .join("");
-        assert!(first_line.contains("H") || first_line.contains("e"));
+            .collect::<String>();
+        assert!(first_line.contains('H') || first_line.contains('e'));
     }
 
     #[test]

@@ -127,7 +127,7 @@ mod tests {
         let command: Vec<String> = if cfg!(windows) && base_command[0] == "echo" {
             vec!["cmd".into(), "/C".into(), base_command[1..].join(" ")]
         } else {
-            base_command.clone()
+            base_command
         };
 
         let args = Args {

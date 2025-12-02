@@ -71,7 +71,7 @@ fn draw_window_decorations(
     canvas.fill_rounded(
         Rgba(BORDER_COLOR),
         metrics.title_bar_height as f32 / 4.0,
-        Corners::ALL,
+        &Corners::ALL,
     );
 
     canvas.fill_rounded_rect(
@@ -81,7 +81,7 @@ fn draw_window_decorations(
         canvas.height() - 2 * metrics.border_width,
         Rgba(DEFAULT_BG_COLOR),
         metrics.title_bar_height as f32 / 4.0,
-        Corners::ALL,
+        &Corners::ALL,
     );
 
     canvas.fill_rounded_rect(
@@ -91,7 +91,7 @@ fn draw_window_decorations(
         metrics.title_bar_height,
         Rgba([30, 34, 42, 255]),
         metrics.title_bar_height as f32 / 4.0,
-        Corners::TOP_LEFT | Corners::TOP_RIGHT,
+        &(Corners::TOP_LEFT | Corners::TOP_RIGHT),
     );
 
     draw_window_buttons(canvas, metrics)

@@ -11,10 +11,10 @@ impl FromStr for Dimension {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.eq_ignore_ascii_case("auto") {
-            return Ok(Dimension::Auto);
+            return Ok(Self::Auto);
         }
 
-        s.parse::<u16>().map(Dimension::Value).map_err(|_| {
+        s.parse::<u16>().map(Self::Value).map_err(|_| {
             format!("Invalid dimension value: {s}. Must be 'auto' or a positive integer")
         })
     }
@@ -23,8 +23,8 @@ impl FromStr for Dimension {
 impl Dimension {
     pub fn to_u16(&self, default: u16) -> u16 {
         match self {
-            Dimension::Value(v) => *v,
-            Dimension::Auto => default,
+            Self::Value(v) => *v,
+            Self::Auto => default,
         }
     }
 }
@@ -45,7 +45,7 @@ mod tests {
         let dim = Dimension::from_str("42").unwrap();
         match dim {
             Dimension::Value(v) => assert_eq!(v, 42),
-            _ => panic!("Expected Dimension::Value"),
+            Dimension::Auto => panic!("Expected Dimension::Value"),
         }
     }
 

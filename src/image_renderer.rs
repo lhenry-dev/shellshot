@@ -121,13 +121,13 @@ impl ImageRenderer {
 
         let y = i32::try_from(start_y)?;
         let mut x_offset = 0;
-        for cell in command_line.iter() {
+        for cell in &command_line {
             let x = i32::try_from(start_x + x_offset)?;
 
             let text = cell.str();
-            let color = resolve_rgba_with_palette(color_palette, cell.attrs().foreground())
+            let color = resolve_rgba_with_palette(&color_palette, cell.attrs().foreground())
                 .unwrap_or(default_fg_color);
-            let background = resolve_rgba_with_palette(color_palette, cell.attrs().background());
+            let background = resolve_rgba_with_palette(&color_palette, cell.attrs().background());
 
             self.canvas.draw_text(text, x, y, color, background);
 
@@ -158,10 +158,10 @@ impl ImageRenderer {
                 let x = i32::try_from(start_x + x_offset)?;
 
                 let text = cell.str();
-                let color = resolve_rgba_with_palette(color_palette, cell.attrs().foreground())
+                let color = resolve_rgba_with_palette(&color_palette, cell.attrs().foreground())
                     .unwrap_or(default_fg_color);
                 let background =
-                    resolve_rgba_with_palette(color_palette, cell.attrs().background());
+                    resolve_rgba_with_palette(&color_palette, cell.attrs().background());
 
                 self.canvas.draw_text(text, x, y, color, background);
 

@@ -3,7 +3,7 @@ use termwiz::{
     surface::{Change, Position, SequenceNo, Surface, SEQ_ZERO},
 };
 
-pub fn process_control(surface: &mut Surface, control_code: &ControlCode) -> SequenceNo {
+pub fn process_control(surface: &mut Surface, control_code: ControlCode) -> SequenceNo {
     match control_code {
         ControlCode::LineFeed
         | ControlCode::VerticalTab
@@ -27,7 +27,7 @@ pub fn process_control(surface: &mut Surface, control_code: &ControlCode) -> Seq
         | ControlCode::FileSeparator
         | ControlCode::GroupSeparator
         | ControlCode::RecordSeparator
-        | ControlCode::UnitSeparator => surface.add_change(*control_code as u8 as char),
+        | ControlCode::UnitSeparator => surface.add_change(control_code as u8 as char),
 
         ControlCode::Backspace => {
             surface.add_change(Change::CursorPosition {
@@ -40,7 +40,6 @@ pub fn process_control(surface: &mut Surface, control_code: &ControlCode) -> Seq
                 y: Position::Relative(0),
             })
         }
-        ControlCode::NEL => SEQ_ZERO,
         ControlCode::RI => {
             let (x, y) = surface.cursor_position();
             if y == 0 {
@@ -56,6 +55,7 @@ pub fn process_control(surface: &mut Surface, control_code: &ControlCode) -> Seq
             }
         }
         ControlCode::Null
+        | ControlCode::NEL
         | ControlCode::StartOfHeading
         | ControlCode::StartOfText
         | ControlCode::EndOfText
@@ -104,7 +104,7 @@ mod tests {
     }
 
     fn apply_control(surface: &mut Surface, code: ControlCode) -> SequenceNo {
-        process_control(surface, &code)
+        process_control(surface, code)
     }
 
     #[test]

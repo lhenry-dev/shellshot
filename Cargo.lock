@@ -1834,7 +1834,6 @@ dependencies = [
  "image",
  "imageproc",
  "num-traits",
- "once_cell",
  "portable-pty",
  "tempfile",
  "termwiz",
