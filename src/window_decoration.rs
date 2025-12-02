@@ -1,16 +1,17 @@
 use crate::{
-    image_renderer::{canvas::Canvas, ImageRendererError},
-    screen_builder::{Cell, Size},
+    image_renderer::{canvas::Canvas, render_size::Size, ImageRendererError},
     window_decoration::no_decoration::NoDecoration,
 };
 
 mod classic;
+pub mod common;
 mod no_decoration;
 
 use ab_glyph::FontArc;
 use clap::ValueEnum;
 pub use classic::Classic;
 use image::Rgba;
+use termwiz::cell::Cell;
 
 /// Type of window decoration to apply around the rendered content
 #[derive(Clone, Debug, ValueEnum)]
@@ -32,6 +33,8 @@ pub trait WindowDecoration: std::fmt::Debug {
     fn compute_metrics(&self, char_size: Size) -> WindowMetrics;
 
     fn default_fg_color(&self) -> Rgba<u8>;
+
+    fn get_color_palette(&self) -> [Rgba<u8>; 256];
 
     fn font(&self) -> Result<&FontArc, ImageRendererError>;
 
@@ -83,6 +86,19 @@ mod tests {
     }
 
     #[test]
+    fn test_all_window_decorations_colors() {
+        for decoration_type in all_window_decorations() {
+            let window_decoration = create_window_decoration(decoration_type.as_ref());
+
+            let fg = window_decoration.default_fg_color();
+            assert!(fg.0[3] > 0, "Alpha channel must be > 0");
+
+            let palette = window_decoration.get_color_palette();
+            assert_eq!(palette.len(), 256, "Palette must have 256 colors");
+        }
+    }
+
+    #[test]
     fn test_all_window_decorations_draw() {
         let canvas_width = 200;
         let canvas_height = 100;
@@ -92,19 +108,12 @@ mod tests {
             let window_decoration = create_window_decoration(decoration_type.as_ref());
 
             let font = window_decoration.font().expect("Font should be available");
-            let default_fg_color = window_decoration.default_fg_color();
 
             let char_size = calculate_char_size(font, scale);
             let metrics = window_decoration.compute_metrics(char_size);
 
-            let mut canvas = Canvas::new(
-                canvas_width,
-                canvas_height,
-                font.clone(),
-                default_fg_color,
-                scale,
-            )
-            .expect("Failed to create Canvas");
+            let mut canvas = Canvas::new(canvas_width, canvas_height, font.clone(), scale)
+                .expect("Failed to create Canvas");
 
             let result = window_decoration.draw_window(&mut canvas, &metrics);
             assert!(

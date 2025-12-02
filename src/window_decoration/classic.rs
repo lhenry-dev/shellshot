@@ -1,17 +1,16 @@
-use std::sync::OnceLock;
-
 use ab_glyph::FontArc;
 use image::Rgba;
+use termwiz::cell::Cell;
 
-use crate::constants::DEFAULT_BG_COLOR;
-use crate::constants::DEFAULT_FG_COLOR;
 use crate::image_renderer::canvas::Canvas;
+use crate::image_renderer::canvas::Corners;
+use crate::image_renderer::render_size::Size;
 use crate::image_renderer::ImageRendererError;
-use crate::screen_builder::ansi::GREEN;
-use crate::screen_builder::ansi::RED;
-use crate::screen_builder::ansi::YELLOW;
-use crate::screen_builder::Cell;
-use crate::screen_builder::Size;
+use crate::window_decoration::common::default_build_command_line;
+use crate::window_decoration::common::default_font;
+use crate::window_decoration::common::get_default_color_palette;
+use crate::window_decoration::common::DEFAULT_BG_COLOR;
+use crate::window_decoration::common::DEFAULT_FG_COLOR;
 use crate::window_decoration::WindowMetrics;
 
 use super::WindowDecoration;
@@ -19,34 +18,15 @@ use super::WindowDecoration;
 #[derive(Debug)]
 pub struct Classic;
 
-const BORDER_COLOR: [u8; 4] = [128, 128, 128, 255];
-const BACKGROUND_COLOR: [u8; 4] = DEFAULT_BG_COLOR;
+const GREEN: Rgba<u8> = Rgba([52, 199, 89, 255]);
+const YELLOW: Rgba<u8> = Rgba([255, 189, 45, 255]);
+const RED: Rgba<u8> = Rgba([255, 95, 87, 255]);
 
-static CASCADIA_CODE_FONT_DATA: &[u8] = include_bytes!("../../assets/CascadiaCode.ttf");
-static CASCADIA_CODE_FONT: OnceLock<Result<FontArc, ImageRendererError>> = OnceLock::new();
+const BORDER_COLOR: [u8; 4] = [128, 128, 128, 255];
 
 impl WindowDecoration for Classic {
     fn build_command_line(&self, command: &str) -> Vec<Cell> {
-        let s = format!("$ {command}");
-
-        let mut chars = s.chars();
-        let mut cells = Vec::with_capacity(s.len());
-
-        if let Some(first) = chars.next() {
-            cells.push(Cell {
-                ch: first,
-                fg: Some(GREEN),
-                bg: None,
-            });
-        }
-
-        cells.extend(chars.map(|ch| Cell {
-            ch,
-            fg: None,
-            bg: None,
-        }));
-
-        cells
+        default_build_command_line(command)
     }
 
     fn compute_metrics(&self, char_size: Size) -> WindowMetrics {
@@ -63,18 +43,16 @@ impl WindowDecoration for Classic {
         }
     }
 
+    fn get_color_palette(&self) -> [Rgba<u8>; 256] {
+        get_default_color_palette()
+    }
+
     fn default_fg_color(&self) -> Rgba<u8> {
         Rgba(DEFAULT_FG_COLOR)
     }
 
     fn font(&self) -> Result<&FontArc, ImageRendererError> {
-        CASCADIA_CODE_FONT
-            .get_or_init(|| {
-                FontArc::try_from_slice(CASCADIA_CODE_FONT_DATA)
-                    .map_err(|_| ImageRendererError::FontLoadError)
-            })
-            .as_ref()
-            .map_err(|_| ImageRendererError::FontLoadError)
+        default_font()
     }
 
     fn draw_window(
@@ -90,22 +68,30 @@ fn draw_window_decorations(
     canvas: &mut Canvas,
     metrics: &WindowMetrics,
 ) -> Result<(), ImageRendererError> {
-    canvas.fill(Rgba(BORDER_COLOR));
+    canvas.fill_rounded(
+        Rgba(BORDER_COLOR),
+        metrics.title_bar_height as f32 / 4.0,
+        &Corners::ALL,
+    );
 
-    canvas.fill_rect(
+    canvas.fill_rounded_rect(
         i32::try_from(metrics.border_width)?,
         i32::try_from(metrics.border_width)?,
         canvas.width() - 2 * metrics.border_width,
         canvas.height() - 2 * metrics.border_width,
-        Rgba(BACKGROUND_COLOR),
+        Rgba(DEFAULT_BG_COLOR),
+        metrics.title_bar_height as f32 / 4.0,
+        &Corners::ALL,
     );
 
-    canvas.fill_rect(
+    canvas.fill_rounded_rect(
         i32::try_from(metrics.border_width)?,
         i32::try_from(metrics.border_width)?,
         canvas.width() - 2 * metrics.border_width,
         metrics.title_bar_height,
         Rgba([30, 34, 42, 255]),
+        metrics.title_bar_height as f32 / 4.0,
+        &(Corners::TOP_LEFT | Corners::TOP_RIGHT),
     );
 
     draw_window_buttons(canvas, metrics)
@@ -121,11 +107,11 @@ fn draw_window_buttons(
 
     let right = i32::try_from(canvas.width() - metrics.border_width)?;
 
-    canvas.draw_circle(right - spacing, btn_y, radius, GREEN);
+    canvas.draw_circle(right - spacing, btn_y, radius, RED);
 
     canvas.draw_circle(right - 2 * spacing, btn_y, radius, YELLOW);
 
-    canvas.draw_circle(right - 3 * spacing, btn_y, radius, RED);
+    canvas.draw_circle(right - 3 * spacing, btn_y, radius, GREEN);
 
     Ok(())
 }

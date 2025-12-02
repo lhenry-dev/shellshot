@@ -1,10 +1,13 @@
 use ab_glyph::{Font, FontArc, PxScale, ScaleFont};
+use termwiz::{cell::Cell, surface::Surface};
 
-use crate::{
-    constants::MIN_WIDTH_CHARS,
-    screen_builder::{ScreenBuilder, Size},
-    window_decoration::WindowMetrics,
-};
+use crate::window_decoration::WindowMetrics;
+
+#[derive(Debug, Clone, Copy)]
+pub struct Size {
+    pub width: u32,
+    pub height: u32,
+}
 
 pub fn calculate_char_size(font: &FontArc, scale: PxScale) -> Size {
     let glyph_id = font.glyph_id('M');
@@ -21,22 +24,33 @@ pub fn calculate_char_size(font: &FontArc, scale: PxScale) -> Size {
 }
 
 pub fn calculate_image_size(
-    screen: &ScreenBuilder,
+    command_line: &[Cell],
+    screen: &Surface,
     metrics: &WindowMetrics,
     char_size: Size,
 ) -> Size {
-    let padding = 2 * metrics.padding;
     let char_width = char_size.width;
     let char_height = char_size.height;
+    let padding = 2 * metrics.padding;
+    let border = 2 * metrics.border_width;
 
-    let mut content_width = screen.dimensions.width * char_width + padding;
-    let mut content_height = screen.dimensions.height * char_height + padding;
+    let (screen_width, screen_height) = screen.dimensions();
+    let mut content_width = screen_width as u32 * char_width + padding + border;
+    let mut content_height =
+        screen_height as u32 * char_height + padding + border + metrics.title_bar_height;
 
-    content_width += 2 * metrics.border_width;
-    content_height += 2 * metrics.border_width + metrics.title_bar_height;
+    let command_line_width: u32 = command_line
+        .iter()
+        .map(|cell| cell.str().chars().count() as u32)
+        .sum::<u32>()
+        * char_width
+        + padding
+        + border;
+    content_width = content_width.max(command_line_width);
+    content_height += char_height;
 
-    let width = content_width.max(MIN_WIDTH_CHARS * char_width);
-    let height = content_height.max(1);
-
-    Size { width, height }
+    Size {
+        width: content_width,
+        height: content_height,
+    }
 }

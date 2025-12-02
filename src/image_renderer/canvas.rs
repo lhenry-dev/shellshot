@@ -1,18 +1,28 @@
-use crate::{
-    image_renderer::{render_size::calculate_char_size, ImageRendererError},
-    screen_builder::Size,
+use crate::image_renderer::{
+    render_size::{calculate_char_size, Size},
+    ImageRendererError,
 };
 use ab_glyph::{FontArc, PxScale};
 use image::{Rgba, RgbaImage};
 use imageproc::drawing::draw_text_mut;
-use tiny_skia::{Color, Paint, PathBuilder, Pixmap, Rect, Transform};
+use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Rect, Transform};
+use tracing::warn;
+
+bitflags::bitflags! {
+    pub struct Corners: u8 {
+        const TOP_LEFT     = 0b0001;
+        const TOP_RIGHT    = 0b0010;
+        const BOTTOM_RIGHT = 0b0100;
+        const BOTTOM_LEFT  = 0b1000;
+        const ALL = Self::TOP_LEFT.bits() | Self::TOP_RIGHT.bits() | Self::BOTTOM_RIGHT.bits() | Self::BOTTOM_LEFT.bits();
+    }
+}
 
 #[derive(Debug)]
 pub struct Canvas {
     pixmap: Pixmap,
     image_for_text: RgbaImage,
     font: FontArc,
-    default_fg_color: Rgba<u8>,
     scale: PxScale,
     char_size: Size,
 }
@@ -22,7 +32,6 @@ impl Canvas {
         width: u32,
         height: u32,
         font: FontArc,
-        default_fg_color: Rgba<u8>,
         scale: PxScale,
     ) -> Result<Self, ImageRendererError> {
         let pixmap = Pixmap::new(width, height).ok_or(ImageRendererError::CanvasInitFailed)?;
@@ -33,7 +42,6 @@ impl Canvas {
             pixmap,
             image_for_text,
             font,
-            default_fg_color,
             scale,
             char_size,
         })
@@ -44,6 +52,18 @@ impl Canvas {
             .fill(Color::from_rgba8(color[0], color[1], color[2], color[3]));
     }
 
+    pub fn fill_rounded(&mut self, color: Rgba<u8>, radius: f32, corners: &Corners) {
+        self.fill_rounded_rect(
+            0,
+            0,
+            self.pixmap.width(),
+            self.pixmap.height(),
+            color,
+            radius,
+            corners,
+        );
+    }
+
     pub fn fill_rect(&mut self, x: i32, y: i32, width: u32, height: u32, color: Rgba<u8>) {
         if let Some(rect) = Rect::from_xywh(x as f32, y as f32, width as f32, height as f32) {
             let mut paint = Paint::default();
@@ -51,6 +71,75 @@ impl Canvas {
             self.pixmap
                 .fill_rect(rect, &paint, Transform::identity(), None);
         }
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    pub fn fill_rounded_rect(
+        &mut self,
+        x: i32,
+        y: i32,
+        width: u32,
+        height: u32,
+        color: Rgba<u8>,
+        radius: f32,
+        corners: &Corners,
+    ) {
+        let x = x as f32;
+        let y = y as f32;
+        let width = width as f32;
+        let height = height as f32;
+
+        let mut pb = PathBuilder::new();
+
+        if corners.contains(Corners::TOP_LEFT) {
+            pb.move_to(x + radius, y);
+        } else {
+            pb.move_to(x, y);
+        }
+
+        if corners.contains(Corners::TOP_RIGHT) {
+            pb.line_to(x + width - radius, y);
+            pb.quad_to(x + width, y, x + width, y + radius);
+        } else {
+            pb.line_to(x + width, y);
+        }
+
+        if corners.contains(Corners::BOTTOM_RIGHT) {
+            pb.line_to(x + width, y + height - radius);
+            pb.quad_to(x + width, y + height, x + width - radius, y + height);
+        } else {
+            pb.line_to(x + width, y + height);
+        }
+
+        if corners.contains(Corners::BOTTOM_LEFT) {
+            pb.line_to(x + radius, y + height);
+            pb.quad_to(x, y + height, x, y + height - radius);
+        } else {
+            pb.line_to(x, y + height);
+        }
+
+        if corners.contains(Corners::TOP_LEFT) {
+            pb.line_to(x, y + radius);
+            pb.quad_to(x, y, x + radius, y);
+        } else {
+            pb.line_to(x, y);
+        }
+
+        let Some(path) = pb.finish() else {
+            warn!("Failed to build rounded rect path");
+            return;
+        };
+
+        let mut paint = Paint::default();
+        paint.set_color(Color::from_rgba8(color[0], color[1], color[2], color[3]));
+
+        self.pixmap.fill_path(
+            &path,
+            &paint,
+            FillRule::Winding,
+            Transform::identity(),
+            None,
+        );
     }
 
     pub fn draw_circle(&mut self, x: i32, y: i32, radius: i32, color: Rgba<u8>) {
@@ -68,26 +157,32 @@ impl Canvas {
         }
     }
 
-    pub fn draw_char(
+    pub fn draw_text(
         &mut self,
-        char: char,
+        text: &str,
         x: i32,
         y: i32,
-        color: Option<Rgba<u8>>,
+        color: Rgba<u8>,
         background: Option<Rgba<u8>>,
     ) {
         if let Some(bg_color) = background {
-            self.fill_rect(x, y, self.char_width(), self.char_height(), bg_color);
+            self.fill_rect(
+                x,
+                y,
+                text.chars().count() as u32 * self.char_width(),
+                self.char_height(),
+                bg_color,
+            );
         }
 
         draw_text_mut(
             &mut self.image_for_text,
-            color.unwrap_or(self.default_fg_color),
+            color,
             x,
             y,
             self.scale,
             &self.font,
-            &char.to_string(),
+            text,
         );
     }
 
@@ -120,8 +215,8 @@ impl Canvas {
             let alpha = text_pixel[3] as f32 / 255.0;
             if alpha > 0.0 {
                 for i in 0..3 {
-                    final_pixel[i] = (text_pixel[i] as f32 * alpha
-                        + final_pixel[i] as f32 * (1.0 - alpha))
+                    final_pixel[i] = (text_pixel[i] as f32)
+                        .mul_add(alpha, final_pixel[i] as f32 * (1.0 - alpha))
                         as u8;
                 }
                 final_pixel[3] = 255;
@@ -129,5 +224,61 @@ impl Canvas {
         }
 
         Ok(final_image)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::window_decoration::common::default_font;
+
+    use super::*;
+    use ab_glyph::FontArc;
+    use image::Rgba;
+
+    fn make_font() -> FontArc {
+        default_font().unwrap().clone()
+    }
+
+    #[test]
+    fn canvas_creation() {
+        let font = make_font();
+        let c = Canvas::new(100, 50, font, 16.0.into());
+        assert!(c.is_ok());
+        let c = c.unwrap();
+        assert_eq!(c.width(), 100);
+        assert_eq!(c.height(), 50);
+    }
+
+    #[test]
+    fn fill_and_fill_rect() {
+        let font = make_font();
+        let mut c = Canvas::new(50, 30, font, 12.0.into()).unwrap();
+        c.fill(Rgba([255, 0, 0, 255]));
+        c.fill_rect(5, 5, 10, 10, Rgba([0, 255, 0, 255]));
+        c.fill_rounded(Rgba([0, 0, 255, 255]), 5.0, &Corners::ALL);
+    }
+
+    #[test]
+    fn draw_shapes_and_text() {
+        let font = make_font();
+        let mut c = Canvas::new(60, 40, font, 12.0.into()).unwrap();
+        c.draw_circle(20, 20, 10, Rgba([255, 255, 0, 255]));
+        c.draw_text(
+            "Hello",
+            5,
+            5,
+            Rgba([0, 0, 0, 255]),
+            Some(Rgba([255, 255, 255, 255])),
+        );
+    }
+
+    #[test]
+    fn final_image_has_correct_dimensions() {
+        let font = make_font();
+        let mut c = Canvas::new(80, 60, font, 14.0.into()).unwrap();
+        c.fill(Rgba([100, 100, 100, 255]));
+        let img = c.to_final_image().unwrap();
+        assert_eq!(img.width(), 80);
+        assert_eq!(img.height(), 60);
     }
 }

@@ -28,9 +28,9 @@ pub enum SaveError {
 /// - Image encoding fails
 pub fn save_to_file(
     image_data: &ImageBuffer<Rgba<u8>, Vec<u8>>,
-    filename: &str,
+    output: &str,
 ) -> Result<(), SaveError> {
-    let path = Path::new(filename);
+    let path = Path::new(output);
 
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
@@ -104,11 +104,21 @@ mod tests {
     }
 
     // INCOMPATIBLE WITH CI ENVIRONMENT
-    // #[test]
-    // fn test_save_to_clipboard() {
-    //     let image = sample_image();
-    //     save_to_clipboard(&image).unwrap();
-    // }
+    #[test]
+    fn test_save_to_clipboard() {
+        let image = sample_image();
+        let result = save_to_clipboard(&image);
+
+        if let Err(SaveError::Clipboard(err)) = &result {
+            match err {
+                arboard::Error::ClipboardNotSupported => return,
+                arboard::Error::Unknown { .. } => return,
+                _ => panic!("Unexpected clipboard error: {err:?}"),
+            }
+        }
+
+        assert!(result.is_ok());
+    }
 
     #[test]
     fn test_error_handling_for_invalid_path() {
