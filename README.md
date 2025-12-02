@@ -111,11 +111,3 @@ shellshot --output docs/example.png cargo --version
 shellshot --clipboard git log --oneline -5
 shellshot --no-decoration python --version
 ```
-
-## Known Issues
-
-- Shellshot uses Rust’s standard library `Command` to capture command output. This means the output might not exactly match what you would see in a real terminal.
-- On **Windows**, the captured command output may have **decoding issues with accented or special characters** because `cmd.exe` does not use UTF-8 by default.
-- `std::process::Command` is **not compatible with shell pipelines or redirections** (e.g., `ls | grep txt` will not work as expected). You would need to run a shell explicitly to handle these.
-- Some commands that rely on interactive terminal features may not display correctly in the generated images.
-- Not all ANSI codes are fully implemented, so some complex formatting, colors, or cursor movements may not render perfectly.
