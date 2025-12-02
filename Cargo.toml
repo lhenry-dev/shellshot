@@ -1,7 +1,7 @@
 [package]
 name = "shellshot"
 authors = ["lhenry-dev <lhenry.dev1@gmail.com>"]
-version = "0.1.1"
+version = "0.2.1"
 edition = "2021"
 rust-version = "1.85.1"
 description = "Transform your command-line output into clean, shareable images with a single command."
