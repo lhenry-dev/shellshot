@@ -69,13 +69,13 @@ Specify the decoration style (default: `classic`):
 shellshot --decoration classic ls -la
 ```
 
-#### `--filename` / `-f`
+#### `--output` / `-o`
 
 Specify a custom output filename:
 
 ```bash
-shellshot --filename my-screenshot.png cargo build
-shellshot --filename screenshots/build.png cargo test
+shellshot --outpout my-screenshot.png cargo build
+shellshot --output screenshots/build.png cargo test
 ```
 
 #### `--clipboard`
@@ -86,12 +86,28 @@ Copy the screenshot directly to your clipboard:
 shellshot --clipboard git status
 ```
 
+#### `--width` / `-W` et `--height` / `-H`
+
+Specify the final image dimensions in pixels or 'auto' (default: auto):
+
+```bash
+shellshot --width 800 --height 600 echo "Hello, world!"
+```
+
+#### `--timeout` / `-t`
+
+Set a timeout in seconds for command execution (0 = no timeout):
+
+```bash
+shellshot --timeout 5 ping -c 10 localhost
+```
+
 ### Examples
 
 ```bash
 shellshot echo "Hello, Shellshot!"
 shellshot --decoration classic ls --color=always
-shellshot --filename docs/example.png cargo --version
+shellshot --output docs/example.png cargo --version
 shellshot --clipboard git log --oneline -5
 shellshot --no-decoration python --version
 ```
