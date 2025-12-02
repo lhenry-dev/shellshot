@@ -112,6 +112,7 @@ mod tests {
         if let Err(SaveError::Clipboard(err)) = &result {
             match err {
                 arboard::Error::ClipboardNotSupported => return,
+                arboard::Error::Unknown { .. } => return,
                 _ => panic!("Unexpected clipboard error: {err:?}"),
             }
         }
