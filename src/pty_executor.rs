@@ -1,4 +1,4 @@
-use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, PtySize};
+use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use std::{
     io::{self, BufReader, BufWriter, Read, Write},
     thread,
@@ -6,19 +6,21 @@ use std::{
 };
 use termwiz::surface::Surface;
 use thiserror::Error;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::{
-    constants::{MAX_HEIGHT, MAX_WIDTH},
+    constants::{SCREEN_MAX_HEIGHT, SCREEN_MAX_WIDTH},
     pty_executor::{
         dimension::Dimension,
+        utils::with_timeout,
         writer::{DetachableWriter, ThreadedWriter},
     },
     terminal_builder::TerminalBuilder,
 };
 
 pub mod dimension;
-mod writer;
+mod utils;
+pub mod writer;
 
 #[derive(Debug, Error)]
 pub enum PtyExecutorError {
@@ -62,6 +64,7 @@ pub struct PtyIO {
 pub struct PtyOptions {
     pub cols: Dimension,
     pub rows: Dimension,
+    pub timeout: Option<Duration>,
 }
 
 pub struct PtyExecutor {}
@@ -84,8 +87,8 @@ impl PtyExecutor {
 
         let pair = pty_system
             .openpty(PtySize {
-                cols: pty_options.cols.to_u16(MAX_WIDTH),
-                rows: pty_options.rows.to_u16(MAX_HEIGHT),
+                cols: pty_options.cols.to_u16(SCREEN_MAX_WIDTH),
+                rows: pty_options.rows.to_u16(SCREEN_MAX_HEIGHT),
                 pixel_width: 0,
                 pixel_height: 0,
             })
@@ -122,11 +125,12 @@ impl PtyExecutor {
         };
         let cols = &pty_options.cols;
         let rows = &pty_options.rows;
+        let timeout = &pty_options.timeout;
 
         thread::scope(|s| -> Result<Surface, PtyExecutorError> {
             let handle = s.spawn(|| TerminalBuilder::run(pty_process, cols, rows));
 
-            with_timeout(None, killer, s, || child.wait())??;
+            with_timeout(*timeout, killer, s, || child.wait())??;
 
             writer.detach()?.flush()?;
             drop(child);
@@ -141,30 +145,86 @@ impl PtyExecutor {
     }
 }
 
-fn with_timeout<'scope, R, F>(
-    timeout: Option<Duration>,
-    mut killer: Box<dyn ChildKiller + Send + Sync>,
-    s: &'scope thread::Scope<'scope, '_>,
-    f: F,
-) -> Result<R, PtyExecutorError>
-where
-    F: FnOnce() -> R,
-{
-    if let Some(timeout) = timeout {
-        let t = s.spawn(move || {
-            thread::park_timeout(timeout);
-            let _ = killer.kill();
-            warn!("Command execution was terminated due to timeout");
-        });
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pty_executor::dimension::Dimension;
+    use std::time::Duration;
 
-        let result = f();
+    fn default_options() -> PtyOptions {
+        PtyOptions {
+            cols: Dimension::Value(80),
+            rows: Dimension::Value(24),
+            timeout: Some(Duration::from_secs(5)),
+        }
+    }
 
-        t.thread().unpark();
-        t.join()
-            .map_err(|e| PtyExecutorError::ThreadJoinFailed(format!("{:?}", e)))?;
+    fn shell_command(cmd: &str) -> Vec<String> {
+        if cfg!(windows) {
+            vec!["cmd".to_string(), "/C".to_string(), cmd.to_string()]
+        } else {
+            vec!["sh".to_string(), "-c".to_string(), cmd.to_string()]
+        }
+    }
 
-        Ok(result)
-    } else {
-        Ok(f())
+    #[test]
+    fn test_run_command_basic() {
+        let options = default_options();
+        let command = shell_command("echo Hello World");
+
+        let surface = PtyExecutor::run_command(&options, &command).expect("Failed to run command");
+
+        let text = surface.screen_chars_to_string();
+        println!("Captured output:\n{}", text);
+        assert!(text.contains("Hello World"));
+    }
+
+    #[test]
+    fn test_run_command_ansi() {
+        let options = default_options();
+
+        let ansi_str = if cfg!(windows) {
+            r#"echo ^[[31mRed^[[0m ^[[32mGreen^[[0m ^[[1mBold^[[0m"#
+        } else {
+            r#"echo -e "\e[31mRed\e[0m \e[32mGreen\e[0m \e[1mBold\e[0m""#
+        };
+
+        let command = shell_command(ansi_str);
+
+        let surface =
+            PtyExecutor::run_command(&options, &command).expect("Failed to run ANSI command");
+
+        let text = surface.screen_chars_to_string();
+        println!("Captured ANSI output:\n{}", text);
+
+        assert!(text.contains("Red"));
+        assert!(text.contains("Green"));
+        assert!(text.contains("Bold"));
+    }
+
+    #[test]
+    fn test_empty_command_error() {
+        let options = default_options();
+        let command: Vec<String> = vec![];
+
+        let result = PtyExecutor::run_command(&options, &command);
+        assert!(matches!(result, Err(PtyExecutorError::EmptyCommand)));
+    }
+
+    #[test]
+    fn test_timeout() {
+        let options = PtyOptions {
+            cols: Dimension::Value(80),
+            rows: Dimension::Value(24),
+            timeout: Some(Duration::from_millis(500)),
+        };
+
+        let command = if cfg!(windows) {
+            shell_command("timeout /T 2")
+        } else {
+            shell_command("sleep 2")
+        };
+
+        PtyExecutor::run_command(&options, &command).unwrap();
     }
 }

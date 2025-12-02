@@ -5,7 +5,7 @@ use thiserror::Error;
 use tracing::info;
 use unicode_width::UnicodeWidthChar;
 
-use crate::constants::{FONT_SIZE, QUALITY_MULTIPLIER};
+use crate::constants::{FONT_SIZE, IMAGE_QUALITY_MULTIPLIER};
 use crate::image_renderer::canvas::Canvas;
 use crate::image_renderer::render_size::{calculate_char_size, calculate_image_size};
 use crate::image_renderer::utils::resolve_rgba_with_palette;
@@ -73,7 +73,7 @@ impl ImageRenderer {
     ) -> Result<Self, ImageRendererError> {
         let font = window_decoration.font()?;
 
-        let scale = PxScale::from((FONT_SIZE * QUALITY_MULTIPLIER) as f32);
+        let scale = PxScale::from((FONT_SIZE * IMAGE_QUALITY_MULTIPLIER) as f32);
         let char_size = calculate_char_size(font, scale);
         let command_line = window_decoration.build_command_line(&command.join(" "));
 
@@ -177,22 +177,35 @@ impl ImageRenderer {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use termwiz::surface::Change;
 
-//     #[test]
-//     fn test_render_image_with_mock_screen() {
-//         let window_decoration = crate::window_decoration::create_window_decoration(None);
+    use crate::window_decoration::create_window_decoration;
 
-//         let screen =
-//             ScreenBuilder::from_output("test", "echo test", window_decoration.as_ref()).unwrap();
+    use super::*;
 
-//         let result = ImageRenderer::render_image(&screen, window_decoration);
+    fn create_mock_surface() -> Surface {
+        let mut surface = Surface::new(10, 5);
+        surface.add_change(Change::Text("echo test".to_string()));
+        surface
+    }
 
-//         assert!(result.is_ok());
-//         let image = result.unwrap();
-//         assert!(image.width() > 0);
-//         assert!(image.height() > 0);
-//     }
-// }
+    #[test]
+    fn test_render_image_with_mock_screen() {
+        let window_decoration = create_window_decoration(None);
+
+        let surface = create_mock_surface();
+
+        let command = vec!["echo".to_string(), "test".to_string()];
+
+        let result = ImageRenderer::render_image(&command, &surface, window_decoration);
+
+        assert!(result.is_ok(), "ImageRenderer failed to render mock screen");
+
+        let image = result.unwrap();
+
+        assert!(image.width() > 0, "Rendered image width should be > 0");
+        assert!(image.height() > 0, "Rendered image height should be > 0");
+    }
+}

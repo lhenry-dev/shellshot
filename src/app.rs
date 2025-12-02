@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use clap::{ArgGroup, Parser};
 use thiserror::Error;
 use tracing::info;
@@ -70,6 +72,10 @@ pub struct Args {
     /// Final image height in pixels, or 'auto'
     #[arg(long, short = 'H', default_value = "auto")]
     pub height: Dimension,
+
+    /// Timeout in seconds for command execution (0 = no timeout)
+    #[arg(long, short = 't')]
+    pub timeout: Option<u64>,
 }
 
 /// Main entry point for shellshot logic
@@ -87,6 +93,7 @@ pub fn run_shellshot(args: Args) -> Result<(), ShellshotError> {
     let pty_options = PtyOptions {
         cols: args.width,
         rows: args.height,
+        timeout: args.timeout.map(Duration::from_secs),
     };
 
     let screen = PtyExecutor::run_command(&pty_options, &args.command)?;
@@ -115,8 +122,16 @@ mod tests {
 
     #[test]
     fn test_execute_command_with_file() {
+        let base_command = vec!["echo".to_string(), "hello".to_string()];
+
+        let command: Vec<String> = if cfg!(windows) && base_command[0] == "echo" {
+            vec!["cmd".into(), "/C".into(), base_command[1..].join(" ")]
+        } else {
+            base_command.clone()
+        };
+
         let args = Args {
-            command: vec!["echo".into(), "hello".into()],
+            command,
             quiet: false,
             no_decoration: false,
             decoration: WindowDecorationType::Classic,
@@ -124,6 +139,7 @@ mod tests {
             clipboard: false,
             width: Dimension::Auto,
             height: Dimension::Auto,
+            timeout: None,
         };
 
         let result = run_shellshot(args);

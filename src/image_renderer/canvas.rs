@@ -226,3 +226,59 @@ impl Canvas {
         Ok(final_image)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::window_decoration::common::default_font;
+
+    use super::*;
+    use ab_glyph::FontArc;
+    use image::Rgba;
+
+    fn make_font() -> FontArc {
+        default_font().unwrap().clone()
+    }
+
+    #[test]
+    fn canvas_creation() {
+        let font = make_font();
+        let c = Canvas::new(100, 50, font.clone(), 16.0.into());
+        assert!(c.is_ok());
+        let c = c.unwrap();
+        assert_eq!(c.width(), 100);
+        assert_eq!(c.height(), 50);
+    }
+
+    #[test]
+    fn fill_and_fill_rect() {
+        let font = make_font();
+        let mut c = Canvas::new(50, 30, font.clone(), 12.0.into()).unwrap();
+        c.fill(Rgba([255, 0, 0, 255]));
+        c.fill_rect(5, 5, 10, 10, Rgba([0, 255, 0, 255]));
+        c.fill_rounded(Rgba([0, 0, 255, 255]), 5.0, Corners::ALL);
+    }
+
+    #[test]
+    fn draw_shapes_and_text() {
+        let font = make_font();
+        let mut c = Canvas::new(60, 40, font.clone(), 12.0.into()).unwrap();
+        c.draw_circle(20, 20, 10, Rgba([255, 255, 0, 255]));
+        c.draw_text(
+            "Hello",
+            5,
+            5,
+            Rgba([0, 0, 0, 255]),
+            Some(Rgba([255, 255, 255, 255])),
+        );
+    }
+
+    #[test]
+    fn final_image_has_correct_dimensions() {
+        let font = make_font();
+        let mut c = Canvas::new(80, 60, font.clone(), 14.0.into()).unwrap();
+        c.fill(Rgba([100, 100, 100, 255]));
+        let img = c.to_final_image().unwrap();
+        assert_eq!(img.width(), 80);
+        assert_eq!(img.height(), 60);
+    }
+}

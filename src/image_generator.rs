@@ -104,11 +104,20 @@ mod tests {
     }
 
     // INCOMPATIBLE WITH CI ENVIRONMENT
-    // #[test]
-    // fn test_save_to_clipboard() {
-    //     let image = sample_image();
-    //     save_to_clipboard(&image).unwrap();
-    // }
+    #[test]
+    fn test_save_to_clipboard() {
+        let image = sample_image();
+        let result = save_to_clipboard(&image);
+
+        if let Err(SaveError::Clipboard(err)) = &result {
+            match err {
+                arboard::Error::ClipboardNotSupported => return,
+                _ => panic!("Unexpected clipboard error: {err:?}"),
+            }
+        }
+
+        assert!(result.is_ok());
+    }
 
     #[test]
     fn test_error_handling_for_invalid_path() {

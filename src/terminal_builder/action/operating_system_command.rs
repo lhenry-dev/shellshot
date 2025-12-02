@@ -76,8 +76,14 @@ fn process_change_dynamic_colors(
                     surface.add_change(Change::Attribute(AttributeChange::Background(attr)));
                 }
             }
-            DynamicColorNumber::TextCursorColor => unimplemented!(),
-            _ => unimplemented!(),
+            DynamicColorNumber::TextCursorColor
+            | DynamicColorNumber::MouseForegroundColor
+            | DynamicColorNumber::MouseBackgroundColor
+            | DynamicColorNumber::TektronixForegroundColor
+            | DynamicColorNumber::TektronixBackgroundColor
+            | DynamicColorNumber::HighlightBackgroundColor
+            | DynamicColorNumber::TektronixCursorColor
+            | DynamicColorNumber::HighlightForegroundColor => (),
         });
 
     SEQ_ZERO
@@ -90,20 +96,22 @@ fn process_reset_dynamic_color(
     let idx: u8 = *dynamic_color_number as u8;
 
     if let Some(which_color) = FromPrimitive::from_u8(idx) {
-        match which_color {
-            DynamicColorNumber::TextForegroundColor => {
-                surface.add_change(Change::Attribute(AttributeChange::Foreground(
-                    ColorAttribute::Default,
-                )));
-            }
-            DynamicColorNumber::TextBackgroundColor => {
-                surface.add_change(Change::Attribute(AttributeChange::Background(
-                    ColorAttribute::Default,
-                )));
-            }
-            DynamicColorNumber::TextCursorColor => unimplemented!(),
-            _ => unimplemented!(),
-        }
+        return match which_color {
+            DynamicColorNumber::TextForegroundColor => surface.add_change(Change::Attribute(
+                AttributeChange::Foreground(ColorAttribute::Default),
+            )),
+            DynamicColorNumber::TextBackgroundColor => surface.add_change(Change::Attribute(
+                AttributeChange::Background(ColorAttribute::Default),
+            )),
+            DynamicColorNumber::TextCursorColor
+            | DynamicColorNumber::MouseForegroundColor
+            | DynamicColorNumber::MouseBackgroundColor
+            | DynamicColorNumber::TektronixForegroundColor
+            | DynamicColorNumber::TektronixBackgroundColor
+            | DynamicColorNumber::HighlightBackgroundColor
+            | DynamicColorNumber::TektronixCursorColor
+            | DynamicColorNumber::HighlightForegroundColor => SEQ_ZERO,
+        };
     }
 
     SEQ_ZERO
@@ -122,5 +130,165 @@ fn color_or_query(
             writer.flush().ok();
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use termwiz::escape::osc::{ColorOrQuery, DynamicColorNumber};
+    use termwiz::escape::OperatingSystemCommand;
+    use termwiz::{
+        color::{ColorAttribute, SrgbaTuple},
+        surface::Surface,
+    };
+
+    fn make_surface() -> Surface {
+        Surface::new(10, 1)
+    }
+
+    fn apply_osc(surface: &mut Surface, osc: OperatingSystemCommand) {
+        let mut writer = std::io::sink();
+        process_operating_system_command(surface, &mut writer, &osc);
+    }
+
+    #[test]
+    fn test_set_foreground_color() {
+        let mut s = make_surface();
+        let color = SrgbaTuple(1.0, 0.0, 0.0, 1.0);
+
+        apply_osc(
+            &mut s,
+            OperatingSystemCommand::ChangeDynamicColors(
+                DynamicColorNumber::TextForegroundColor,
+                vec![ColorOrQuery::Color(color)],
+            ),
+        );
+
+        s.add_change("A");
+        let screen = s.screen_cells();
+        let cell = &screen[0][0];
+        assert_eq!(
+            cell.attrs().foreground(),
+            ColorAttribute::TrueColorWithDefaultFallback(color)
+        );
+    }
+
+    #[test]
+    fn test_set_background_color() {
+        let mut s = make_surface();
+        let color = SrgbaTuple(0.0, 1.0, 0.0, 1.0);
+
+        apply_osc(
+            &mut s,
+            OperatingSystemCommand::ChangeDynamicColors(
+                DynamicColorNumber::TextBackgroundColor,
+                vec![ColorOrQuery::Color(color)],
+            ),
+        );
+
+        s.add_change("B");
+        let screen = s.screen_cells();
+        let cell = &screen[0][0];
+        assert_eq!(
+            cell.attrs().background(),
+            ColorAttribute::TrueColorWithDefaultFallback(color)
+        );
+    }
+
+    #[test]
+    fn test_reset_foreground_color() {
+        let mut s = make_surface();
+        let color = SrgbaTuple(1.0, 0.0, 0.0, 1.0);
+
+        apply_osc(
+            &mut s,
+            OperatingSystemCommand::ChangeDynamicColors(
+                DynamicColorNumber::TextForegroundColor,
+                vec![ColorOrQuery::Color(color)],
+            ),
+        );
+
+        apply_osc(
+            &mut s,
+            OperatingSystemCommand::ResetDynamicColor(DynamicColorNumber::TextForegroundColor),
+        );
+
+        s.add_change("C");
+        let screen = s.screen_cells();
+        let cell = &screen[0][0];
+        assert_eq!(cell.attrs().foreground(), ColorAttribute::Default);
+    }
+
+    #[test]
+    fn test_reset_background_color() {
+        let mut s = make_surface();
+        let color = SrgbaTuple(0.0, 1.0, 0.0, 1.0);
+
+        apply_osc(
+            &mut s,
+            OperatingSystemCommand::ChangeDynamicColors(
+                DynamicColorNumber::TextBackgroundColor,
+                vec![ColorOrQuery::Color(color)],
+            ),
+        );
+
+        apply_osc(
+            &mut s,
+            OperatingSystemCommand::ResetDynamicColor(DynamicColorNumber::TextBackgroundColor),
+        );
+
+        s.add_change("D");
+        let screen = s.screen_cells();
+        let cell = &screen[0][0];
+        assert_eq!(cell.attrs().background(), ColorAttribute::Default);
+    }
+
+    #[test]
+    fn test_reset_colors_multiple() {
+        let mut s = make_surface();
+        let color = SrgbaTuple(0.0, 1.0, 0.0, 1.0);
+
+        apply_osc(
+            &mut s,
+            OperatingSystemCommand::ChangeDynamicColors(
+                DynamicColorNumber::TextBackgroundColor,
+                vec![ColorOrQuery::Color(color)],
+            ),
+        );
+
+        apply_osc(
+            &mut s,
+            OperatingSystemCommand::ResetColors(vec![
+                DynamicColorNumber::TextForegroundColor as u8,
+                DynamicColorNumber::TextBackgroundColor as u8,
+            ]),
+        );
+
+        s.add_change("E");
+        let screen = s.screen_cells();
+        let cell = &screen[0][0];
+        assert_eq!(cell.attrs().foreground(), ColorAttribute::Default);
+        assert_eq!(cell.attrs().background(), ColorAttribute::Default);
+    }
+
+    #[test]
+    fn test_color_or_query_query_does_not_modify_cell() {
+        let mut s = make_surface();
+
+        apply_osc(
+            &mut s,
+            OperatingSystemCommand::ChangeDynamicColors(
+                DynamicColorNumber::TextForegroundColor,
+                vec![ColorOrQuery::Query],
+            ),
+        );
+
+        s.add_change("F");
+        let screen = s.screen_cells();
+        let cell = &screen[0][0];
+
+        assert_eq!(cell.attrs().foreground(), ColorAttribute::Default);
+        assert_eq!(cell.attrs().background(), ColorAttribute::Default);
     }
 }

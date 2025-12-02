@@ -1,12 +1,10 @@
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead};
 use termwiz::color::ColorAttribute;
 use termwiz::escape::parser::Parser;
-use termwiz::escape::Action;
 use termwiz::surface::Surface;
 use thiserror::Error;
-use tracing::trace;
 
-use crate::constants::{MAX_HEIGHT, MAX_WIDTH};
+use crate::constants::{SCREEN_MAX_HEIGHT, SCREEN_MAX_WIDTH};
 use crate::pty_executor::dimension::Dimension;
 use crate::pty_executor::PtyIO;
 use crate::terminal_builder::action::process_action;
@@ -34,8 +32,8 @@ impl TerminalBuilder {
         let mut terminal = Self {
             pty_process,
             surface: Surface::new(
-                cols.to_u16(MAX_WIDTH).into(),
-                rows.to_u16(MAX_HEIGHT).into(),
+                cols.to_u16(SCREEN_MAX_WIDTH).into(),
+                rows.to_u16(SCREEN_MAX_HEIGHT).into(),
             ),
         };
 
@@ -67,10 +65,6 @@ impl TerminalBuilder {
             parser.parse(buf, |action| action.append_to(&mut actions));
 
             for action in actions {
-                if let Action::PrintString(s) = &action {
-                    trace!("Currently parsing: {}", s);
-                    io::stdout().flush()?;
-                }
                 let seq = process_action(surface, writer, &action);
                 surface.flush_changes_older_than(seq);
             }
@@ -117,5 +111,77 @@ impl TerminalBuilder {
         };
 
         self.surface.resize(new_cols, new_rows);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use termwiz::surface::Change;
+
+    use super::*;
+    use crate::pty_executor::writer::DetachableWriter;
+    use crate::pty_executor::PtyIO;
+    use std::io::{self, BufReader, Cursor};
+
+    fn create_mock_pty(content: &[u8]) -> PtyIO {
+        let cursor: Box<dyn io::Read + Send> = Box::new(Cursor::new(content.to_vec()));
+        let reader = BufReader::new(cursor);
+        let writer = DetachableWriter::new(Box::new(io::sink()));
+        PtyIO { reader, writer }
+    }
+
+    #[test]
+    fn test_terminal_builder_run_simple_text() {
+        let content = b"Hello, Terminal!";
+        let pty_process = create_mock_pty(content);
+
+        // Utiliser des dimensions fixes
+        let surface =
+            TerminalBuilder::run(pty_process, &Dimension::Value(10), &Dimension::Value(5))
+                .expect("TerminalBuilder should run");
+
+        // Vérifie les dimensions
+        let (cols, rows) = surface.dimensions();
+        assert_eq!(cols, 10);
+        assert_eq!(rows, 5);
+
+        // Vérifie que du texte a été écrit
+        let first_line: String = surface.screen_lines()[0]
+            .visible_cells()
+            .map(|c| c.str().to_string())
+            .collect::<Vec<_>>()
+            .join("");
+        assert!(first_line.contains("H") || first_line.contains("e"));
+    }
+
+    #[test]
+    fn test_run_loop_empty_content() {
+        let pty_process = create_mock_pty(b"");
+        let mut builder = TerminalBuilder {
+            pty_process,
+            surface: Surface::new(5, 5),
+        };
+
+        let result = builder.run_loop();
+        assert!(result.is_ok());
+        let surface = result.unwrap();
+        let (cols, rows) = surface.dimensions();
+        assert_eq!(cols, 5);
+        assert_eq!(rows, 5);
+    }
+
+    #[test]
+    fn test_resize_surface_auto() {
+        let mut surface = Surface::new(10, 5);
+        surface.add_change(Change::Text("X".to_string()));
+        let mut builder = TerminalBuilder {
+            pty_process: create_mock_pty(b""),
+            surface,
+        };
+
+        builder.resize_surface(true, true);
+        let (new_cols, new_rows) = builder.surface.dimensions();
+        assert!(new_cols > 0);
+        assert!(new_rows > 0);
     }
 }

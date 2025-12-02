@@ -92,3 +92,71 @@ pub fn process_control(surface: &mut Surface, control_code: &ControlCode) -> Seq
         | ControlCode::APC => SEQ_ZERO,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use termwiz::escape::ControlCode;
+    use termwiz::surface::{Change, Position, Surface};
+
+    fn make_surface() -> Surface {
+        Surface::new(10, 3)
+    }
+
+    fn apply_control(surface: &mut Surface, code: ControlCode) -> SequenceNo {
+        process_control(surface, &code)
+    }
+
+    #[test]
+    fn test_linefeed() {
+        let mut s = make_surface();
+        let (_, y_before) = s.cursor_position();
+        apply_control(&mut s, ControlCode::LineFeed);
+        let (_, y_after) = s.cursor_position();
+        assert_eq!(y_after, y_before + 1);
+    }
+
+    #[test]
+    fn test_carriage_return() {
+        let mut s = make_surface();
+        s.add_change("ABCDE");
+        apply_control(&mut s, ControlCode::CarriageReturn);
+        let (x, _) = s.cursor_position();
+        assert_eq!(x, 0);
+    }
+
+    #[test]
+    fn test_backspace() {
+        let mut s = make_surface();
+        s.add_change("X");
+        let before = s.cursor_position();
+        apply_control(&mut s, ControlCode::Backspace);
+        let after = s.cursor_position();
+        assert_eq!(after.0, before.0.saturating_sub(1));
+    }
+
+    #[test]
+    fn test_ri_at_top() {
+        let mut s = make_surface();
+        s.add_change(Change::CursorPosition {
+            x: Position::Absolute(2),
+            y: Position::Absolute(0),
+        });
+        apply_control(&mut s, ControlCode::RI);
+        let (_, y) = s.cursor_position();
+        assert_eq!(y, 0);
+    }
+
+    #[test]
+    fn test_ri_not_at_top() {
+        let mut s = make_surface();
+        s.add_change(Change::CursorPosition {
+            x: Position::Absolute(1),
+            y: Position::Absolute(2),
+        });
+        let before_y = s.cursor_position().1;
+        apply_control(&mut s, ControlCode::RI);
+        let (_, after_y) = s.cursor_position();
+        assert_eq!(after_y, before_y - 1);
+    }
+}

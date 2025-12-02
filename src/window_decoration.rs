@@ -4,7 +4,7 @@ use crate::{
 };
 
 mod classic;
-mod common;
+pub mod common;
 mod no_decoration;
 
 use ab_glyph::FontArc;
@@ -82,6 +82,19 @@ mod tests {
                 !command_line.is_empty(),
                 "Unexpected number of cells for {decoration_type:?}",
             );
+        }
+    }
+
+    #[test]
+    fn test_all_window_decorations_colors() {
+        for decoration_type in all_window_decorations() {
+            let window_decoration = create_window_decoration(decoration_type.as_ref());
+
+            let fg = window_decoration.default_fg_color();
+            assert!(fg.0[3] > 0, "Alpha channel must be > 0");
+
+            let palette = window_decoration.get_color_palette();
+            assert_eq!(palette.len(), 256, "Palette must have 256 colors");
         }
     }
 
