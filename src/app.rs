@@ -50,11 +50,16 @@ pub struct Args {
     pub quiet: bool,
 
     /// Do not draw window decorations
-    #[arg(long)]
+    #[arg(long, conflicts_with = "decoration")]
     pub no_decoration: bool,
 
     /// Specify decoration style
-    #[arg(long, short = 'd', default_value = "classic")]
+    #[arg(
+        long,
+        short = 'd',
+        default_value = "classic",
+        conflicts_with = "no_decoration"
+    )]
     pub decoration: WindowDecorationType,
 
     /// Specify output filename
@@ -65,17 +70,21 @@ pub struct Args {
     #[arg(long, conflicts_with = "output")]
     pub clipboard: bool,
 
-    /// Final image width in pixels, or 'auto'
+    /// Final image width in terminal columns, or 'auto'
     #[arg(long, short = 'W', default_value = "auto")]
     pub width: Dimension,
 
-    /// Final image height in pixels, or 'auto'
+    /// Final image height in terminal lines, or 'auto'
     #[arg(long, short = 'H', default_value = "auto")]
     pub height: Dimension,
 
-    /// Timeout in seconds for command execution (0 = no timeout)
+    /// Timeout in seconds for command execution
     #[arg(long, short = 't')]
     pub timeout: Option<u64>,
+
+    /// Force execution inside a shell (sh on Linux/macOS, bash on Windows)
+    #[arg(long)]
+    pub shell: bool,
 }
 
 /// Main entry point for shellshot logic
@@ -94,6 +103,7 @@ pub fn run_shellshot(args: Args) -> Result<(), ShellshotError> {
         cols: args.width,
         rows: args.height,
         timeout: args.timeout.map(Duration::from_secs),
+        shell: args.shell,
     };
 
     let screen = PtyExecutor::run_command(&pty_options, &args.command)?;
@@ -140,6 +150,7 @@ mod tests {
             width: Dimension::Auto,
             height: Dimension::Auto,
             timeout: None,
+            shell: false,
         };
 
         let result = run_shellshot(args);

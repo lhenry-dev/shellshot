@@ -112,8 +112,8 @@ impl ImageRenderer {
         let start_y =
             self.metrics.border_width + self.metrics.title_bar_height + self.metrics.padding;
 
-        let default_fg_color = self.window_decoration.default_fg_color();
         let color_palette = self.window_decoration.get_color_palette();
+        let default_fg_color = color_palette[7];
 
         let command_line = self
             .window_decoration
@@ -146,8 +146,8 @@ impl ImageRenderer {
         let start_y =
             self.metrics.border_width + self.metrics.title_bar_height + self.metrics.padding;
 
-        let default_fg_color = self.window_decoration.default_fg_color();
         let color_palette = self.window_decoration.get_color_palette();
+        let default_fg_color = color_palette[7];
 
         for (row_idx, line) in screen.screen_lines().iter().enumerate() {
             let row_idx = u32::try_from(row_idx + 1)?;

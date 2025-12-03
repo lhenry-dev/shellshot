@@ -8,8 +8,6 @@ use crate::image_renderer::ImageRendererError;
 use crate::window_decoration::common::default_build_command_line;
 use crate::window_decoration::common::default_font;
 use crate::window_decoration::common::get_default_color_palette;
-use crate::window_decoration::common::DEFAULT_BG_COLOR;
-use crate::window_decoration::common::DEFAULT_FG_COLOR;
 use crate::window_decoration::WindowMetrics;
 
 use super::WindowDecoration;
@@ -36,10 +34,6 @@ impl WindowDecoration for NoDecoration {
         get_default_color_palette()
     }
 
-    fn default_fg_color(&self) -> Rgba<u8> {
-        Rgba(DEFAULT_FG_COLOR)
-    }
-
     fn font(&self) -> Result<&FontArc, ImageRendererError> {
         default_font()
     }
@@ -49,7 +43,8 @@ impl WindowDecoration for NoDecoration {
         canvas: &mut Canvas,
         _metrics: &WindowMetrics,
     ) -> Result<(), ImageRendererError> {
-        canvas.fill(Rgba(DEFAULT_BG_COLOR));
+        let bg_color = self.get_color_palette()[0];
+        canvas.fill(bg_color);
         Ok(())
     }
 }

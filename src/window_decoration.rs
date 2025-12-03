@@ -32,8 +32,6 @@ pub trait WindowDecoration: std::fmt::Debug {
 
     fn compute_metrics(&self, char_size: Size) -> WindowMetrics;
 
-    fn default_fg_color(&self) -> Rgba<u8>;
-
     fn get_color_palette(&self) -> [Rgba<u8>; 256];
 
     fn font(&self) -> Result<&FontArc, ImageRendererError>;
@@ -90,7 +88,7 @@ mod tests {
         for decoration_type in all_window_decorations() {
             let window_decoration = create_window_decoration(decoration_type.as_ref());
 
-            let fg = window_decoration.default_fg_color();
+            let fg = window_decoration.get_color_palette()[7];
             assert!(fg.0[3] > 0, "Alpha channel must be > 0");
 
             let palette = window_decoration.get_color_palette();

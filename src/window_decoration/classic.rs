@@ -9,8 +9,6 @@ use crate::image_renderer::ImageRendererError;
 use crate::window_decoration::common::default_build_command_line;
 use crate::window_decoration::common::default_font;
 use crate::window_decoration::common::get_default_color_palette;
-use crate::window_decoration::common::DEFAULT_BG_COLOR;
-use crate::window_decoration::common::DEFAULT_FG_COLOR;
 use crate::window_decoration::WindowMetrics;
 
 use super::WindowDecoration;
@@ -47,10 +45,6 @@ impl WindowDecoration for Classic {
         get_default_color_palette()
     }
 
-    fn default_fg_color(&self) -> Rgba<u8> {
-        Rgba(DEFAULT_FG_COLOR)
-    }
-
     fn font(&self) -> Result<&FontArc, ImageRendererError> {
         default_font()
     }
@@ -60,13 +54,15 @@ impl WindowDecoration for Classic {
         canvas: &mut Canvas,
         metrics: &WindowMetrics,
     ) -> Result<(), ImageRendererError> {
-        draw_window_decorations(canvas, metrics)
+        let bg_color = self.get_color_palette()[0];
+        draw_window_decorations(canvas, metrics, bg_color)
     }
 }
 
 fn draw_window_decorations(
     canvas: &mut Canvas,
     metrics: &WindowMetrics,
+    bg_color: Rgba<u8>,
 ) -> Result<(), ImageRendererError> {
     canvas.fill_rounded(
         Rgba(BORDER_COLOR),
@@ -79,7 +75,7 @@ fn draw_window_decorations(
         i32::try_from(metrics.border_width)?,
         canvas.width() - 2 * metrics.border_width,
         canvas.height() - 2 * metrics.border_width,
-        Rgba(DEFAULT_BG_COLOR),
+        bg_color,
         metrics.title_bar_height as f32 / 4.0,
         &Corners::ALL,
     );

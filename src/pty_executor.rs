@@ -65,6 +65,7 @@ pub struct PtyOptions {
     pub cols: Dimension,
     pub rows: Dimension,
     pub timeout: Option<Duration>,
+    pub shell: bool,
 }
 
 pub struct PtyExecutor {}
@@ -78,8 +79,22 @@ impl PtyExecutor {
             return Err(PtyExecutorError::EmptyCommand);
         }
 
-        let cmd_name = &command[0];
-        let args = &command[1..];
+        let final_command: Vec<String> = if pty_options.shell {
+            let joined = command.join(" ");
+            #[cfg(target_os = "windows")]
+            {
+                vec!["cmd".into(), "/C".into(), joined]
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                vec!["sh".into(), "-c".into(), joined]
+            }
+        } else {
+            command.to_vec()
+        };
+
+        let cmd_name = &final_command[0];
+        let args = &final_command[1..];
 
         info!("Executing command: {} {}", cmd_name, args.join(" "));
 
@@ -156,6 +171,7 @@ mod tests {
             cols: Dimension::Value(80),
             rows: Dimension::Value(24),
             timeout: Some(Duration::from_secs(5)),
+            shell: false,
         }
     }
 
@@ -217,6 +233,7 @@ mod tests {
             cols: Dimension::Value(80),
             rows: Dimension::Value(24),
             timeout: Some(Duration::from_millis(500)),
+            shell: false,
         };
 
         let command = if cfg!(windows) {

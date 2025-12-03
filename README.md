@@ -35,10 +35,26 @@ cargo install shellshot
 
 ## Usage Examples
 
+### Usage Notes
+
+- On Windows, some commands may require `--shell` to execute correctly (forces execution inside Bash on Windows).
+- Either `--output <file>` or `--clipboard` must be specified, otherwise `shellshot` will fail.
+
 ### Basic Usage
 
+On Linux, commands usually work directly:
+
 ```bash
-shellshot echo "Hello from ShellShot!"
+# Linux
+shellshot -o out.png echo "Hello from ShellShot!"
+```
+
+On Windows, some commands (like `echo`) are shell builtins, not executables.
+You need to force execution inside a shell using [`--shell`](#shell--force-execution-inside-a-shell)
+
+```bash
+# Windows
+shellshot --shell -o out.png echo "Hello from ShellShot!"
 ```
 
 This will execute the command, capture its output, and generate an image file named `out.png` in the current directory.
@@ -46,19 +62,38 @@ This will execute the command, capture its output, and generate an image file na
 ![echo example](docs/echo_example.png)
 
 ```bash
-shellshot ping -c 5 localhost
+shellshot -o out.png ping -c 5 localhost
 ```
 
 ![ping example](docs/ping_example.png)
 
 ### Command Options
 
+#### `--shell` — Force execution inside a shell
+
+The `--shell` flag forces Shellshot to execute the command **inside a shell** instead of running it directly.
+
+**Why this is needed:**
+
+- **Linux/macOS**: Forces execution inside `sh`. Most commands are either executables or shell builtins, so they usually run correctly without `--shell`. Use it if you want consistent shell behavior (e.g., for complex scripts or shell operators like pipes and redirects).
+- **Windows**: Forces execution inside Bash. Many common commands like `echo` or `dir` are **shell builtins**, not standalone executables. Using `--shell` ensures these commands run correctly.
+
+**Example:**
+
+```bash
+# Linux — works directly
+shellshot -o out.png echo "Hello from ShellShot!"
+
+# Windows — must use --shell because echo is a shell builtin
+shellshot --shell -o out.png echo "Hello from ShellShot!"
+```
+
 #### `--no-decoration`
 
 Remove window decorations (title bar and control buttons):
 
 ```bash
-shellshot --no-decoration echo "Hello, World!"
+shellshot -o out.png --no-decoration node --version
 ```
 
 #### `--decoration <style>` / `-d`
@@ -66,7 +101,10 @@ shellshot --no-decoration echo "Hello, World!"
 Specify the decoration style (default: `classic`):
 
 ```bash
-shellshot --decoration classic ls -la
+# Linux
+shellshot -o out.png --decoration classic ls --color=always
+# Windows
+shellshot --shell -o out.png --decoration classic dir
 ```
 
 #### `--output` / `-o`
@@ -74,8 +112,8 @@ shellshot --decoration classic ls -la
 Specify a custom output filename:
 
 ```bash
-shellshot --outpout my-screenshot.png cargo build
-shellshot --output screenshots/build.png cargo test
+shellshot --output out.png cargo build
+shellshot -o screenshots/out.png cargo test
 ```
 
 #### `--clipboard`
@@ -88,26 +126,35 @@ shellshot --clipboard git status
 
 #### `--width` / `-W` et `--height` / `-H`
 
-Specify the final image dimensions in pixels or 'auto' (default: auto):
+Specify the final image dimensions in **columns** (width) and **rows** (height), or use `'auto'` (default: auto):
 
 ```bash
-shellshot --width 800 --height 600 echo "Hello, world!"
+# Linux
+shellshot -o out.png --width 70 --height 50 echo "Hello, world!"
+# Windows
+shellshot --shell -o out.png --width 70 --height 50 echo "Hello, world!"
 ```
 
 #### `--timeout` / `-t`
 
-Set a timeout in seconds for command execution (0 = no timeout):
+Set a timeout in seconds for command execution:
 
 ```bash
-shellshot --timeout 5 ping -c 10 localhost
+shellshot -o out.png --timeout 5 ping -c 10 localhost
 ```
 
 ### Examples
 
 ```bash
-shellshot echo "Hello, Shellshot!"
-shellshot --decoration classic ls --color=always
-shellshot --output docs/example.png cargo --version
+shellshot -o out.png cargo --version
 shellshot --clipboard git log --oneline -5
-shellshot --no-decoration python --version
+shellshot -o out.png --no-decoration python --version
+
+# Linux
+shellshot -o out.png echo "Hello, Shellshot!"
+shellshot -o out.png --decoration classic ls --color=always
+
+# Windows (commande équivalente à ls)
+shellshot --shell -o out.png echo "Hello, Shellshot!"
+shellshot --shell -o out.png --decoration classic dir
 ```
