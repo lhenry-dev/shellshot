@@ -154,7 +154,7 @@ shellshot -o out.png --no-decoration python --version
 shellshot -o out.png echo "Hello, Shellshot!"
 shellshot -o out.png --decoration classic ls --color=always
 
-# Windows (commande équivalente à ls)
+# Windows
 shellshot --shell -o out.png echo "Hello, Shellshot!"
 shellshot --shell -o out.png --decoration classic dir
 ```
