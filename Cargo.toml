@@ -22,20 +22,20 @@ name = "shellshot"
 path = "src/main.rs"
 
 [dependencies]
+ab_glyph = "0.2.32"
+arboard = "3.6.1"
+bitflags = "2.10.0"
 clap = { version = "4.5.51", features = ["derive"] }
 image = "0.25.8"
 imageproc = "0.25.0"
-thiserror = "2.0.17"
-arboard = "3.6.1"
-unicode-width = "0.2.2"
-ab_glyph = "0.2.32"
-tiny-skia = "0.11.4"
-termwiz = "0.23.3"
-portable-pty = "0.9.0"
 num-traits = "0.2.19"
-bitflags = "2.10.0"
+portable-pty = "0.9.0"
+termwiz = "0.23.3"
+thiserror = "2.0.17"
+tiny-skia = "0.11.4"
 tracing = "0.1.43"
 tracing-subscriber = "0.3.22"
+unicode-width = "0.2.2"
 
 [dev-dependencies]
 tempfile = "3.23.0"
