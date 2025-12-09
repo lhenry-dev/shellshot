@@ -158,3 +158,21 @@ shellshot -o out.png --decoration classic ls --color=always
 shellshot --shell -o out.png echo "Hello, Shellshot!"
 shellshot --shell -o out.png --decoration classic dir
 ```
+
+## Support
+
+For issues and questions:
+
+- Open an issue on GitHub
+- Check the [documentation](https://docs.rs/shellshot)
+
+# License
+
+This project is licensed under either of
+
+- Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or
+  <https://www.apache.org/licenses/LICENSE-2.0>)
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or
+  <https://opensource.org/licenses/MIT>)
+
+at your option.
