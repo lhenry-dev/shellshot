@@ -29,12 +29,11 @@ fn process_edit(surface: &mut Surface, edit: &Edit) -> SequenceNo {
     match edit {
         Edit::EraseCharacter(n) => {
             let (x, y) = surface.cursor_position();
-            let new_x = x.saturating_sub(*n as usize);
+            surface.add_change(Change::Text(" ".repeat(*n as usize)));
             surface.add_change(Change::CursorPosition {
-                x: Position::Absolute(new_x),
+                x: Position::Absolute(x),
                 y: Position::Absolute(y),
-            });
-            surface.add_change(Change::Text(" ".repeat(*n as usize)))
+            })
         }
         Edit::EraseInLine(_)
         | Edit::InsertCharacter(_)
@@ -93,7 +92,7 @@ mod tests {
         let csi = CSI::Edit(Edit::EraseCharacter(3));
         process_csi(&mut s, &mut std::io::sink(), &csi);
         let content = s.screen_chars_to_string();
-        println!("{content}");
-        assert!(content.starts_with("AB   "));
+        println!("{content:?}");
+        assert!(content.starts_with("ABCDE"));
     }
 }

@@ -1,5 +1,3 @@
-use std::sync::OnceLock;
-
 use ab_glyph::FontArc;
 use image::Rgba;
 use termwiz::{
@@ -7,10 +5,15 @@ use termwiz::{
     color::ColorAttribute,
 };
 
-use crate::image_renderer::ImageRendererError;
+use crate::{image_renderer::ImageRendererError, window_decoration::Fonts};
 
 pub static CASCADIA_CODE_FONT_DATA: &[u8] = include_bytes!("../../assets/CascadiaCode.ttf");
-pub static CASCADIA_CODE_FONT: OnceLock<Result<FontArc, ImageRendererError>> = OnceLock::new();
+pub static CASCADIA_CODE_BOLD_FONT_DATA: &[u8] =
+    include_bytes!("../../assets/CascadiaCode-Bold.ttf");
+pub static CASCADIA_CODE_BOLDITALIC_FONT_DATA: &[u8] =
+    include_bytes!("../../assets/CascadiaCode-BoldItalic.ttf");
+pub static CASCADIA_CODE_ITALIC_FONT_DATA: &[u8] =
+    include_bytes!("../../assets/CascadiaCode-Italic.ttf");
 
 pub fn default_build_command_line(command: &str) -> Vec<Cell> {
     let mut cells = Vec::with_capacity(2 + command.len());
@@ -33,14 +36,17 @@ pub fn default_build_command_line(command: &str) -> Vec<Cell> {
     cells
 }
 
-pub fn default_font() -> Result<&'static FontArc, ImageRendererError> {
-    CASCADIA_CODE_FONT
-        .get_or_init(|| {
-            FontArc::try_from_slice(CASCADIA_CODE_FONT_DATA)
-                .map_err(|_| ImageRendererError::FontLoadError)
-        })
-        .as_ref()
-        .map_err(|_| ImageRendererError::FontLoadError)
+pub fn default_font() -> Result<Fonts, ImageRendererError> {
+    Ok(Fonts {
+        regular: FontArc::try_from_slice(CASCADIA_CODE_FONT_DATA)
+            .map_err(|_| ImageRendererError::FontLoadError)?,
+        bold: FontArc::try_from_slice(CASCADIA_CODE_BOLD_FONT_DATA)
+            .map_err(|_| ImageRendererError::FontLoadError)?,
+        italic: FontArc::try_from_slice(CASCADIA_CODE_ITALIC_FONT_DATA)
+            .map_err(|_| ImageRendererError::FontLoadError)?,
+        bold_italic: FontArc::try_from_slice(CASCADIA_CODE_BOLDITALIC_FONT_DATA)
+            .map_err(|_| ImageRendererError::FontLoadError)?,
+    })
 }
 
 pub fn get_default_color_palette() -> [Rgba<u8>; 256] {
