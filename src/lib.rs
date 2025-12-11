@@ -12,3 +12,4 @@ mod terminal_builder;
 mod window_decoration;
 
 pub use app::{run_shellshot, Args};
+pub use window_decoration::WindowDecorationType;

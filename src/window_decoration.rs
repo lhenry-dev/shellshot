@@ -27,6 +27,14 @@ pub struct WindowMetrics {
     pub title_bar_height: u32,
 }
 
+#[derive(Debug, Clone)]
+pub struct Fonts {
+    pub regular: FontArc,
+    pub bold: FontArc,
+    pub italic: FontArc,
+    pub bold_italic: FontArc,
+}
+
 pub trait WindowDecoration: std::fmt::Debug {
     fn build_command_line(&self, command: &str) -> Vec<Cell>;
 
@@ -34,7 +42,7 @@ pub trait WindowDecoration: std::fmt::Debug {
 
     fn get_color_palette(&self) -> [Rgba<u8>; 256];
 
-    fn font(&self) -> Result<&FontArc, ImageRendererError>;
+    fn font(&self) -> Result<Fonts, ImageRendererError>;
 
     fn draw_window(
         &self,
@@ -107,7 +115,7 @@ mod tests {
 
             let font = window_decoration.font().expect("Font should be available");
 
-            let char_size = calculate_char_size(font, scale);
+            let char_size = calculate_char_size(&font.regular, scale);
             let metrics = window_decoration.compute_metrics(char_size);
 
             let mut canvas = Canvas::new(canvas_width, canvas_height, font.clone(), scale)

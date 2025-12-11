@@ -1,10 +1,15 @@
-use crate::image_renderer::{
-    render_size::{calculate_char_size, Size},
-    ImageRendererError,
+use crate::{
+    image_renderer::{
+        render_size::{calculate_char_size, Size},
+        utils::resolve_rgba_with_palette,
+        ImageRendererError,
+    },
+    window_decoration::Fonts,
 };
-use ab_glyph::{FontArc, PxScale};
+use ab_glyph::PxScale;
 use image::{Rgba, RgbaImage};
 use imageproc::drawing::draw_text_mut;
+use termwiz::cell::{CellAttributes, Intensity, Underline};
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Rect, Transform};
 use tracing::warn;
 
@@ -22,7 +27,7 @@ bitflags::bitflags! {
 pub struct Canvas {
     pixmap: Pixmap,
     image_for_text: RgbaImage,
-    font: FontArc,
+    font: Fonts,
     scale: PxScale,
     char_size: Size,
 }
@@ -31,12 +36,12 @@ impl Canvas {
     pub fn new(
         width: u32,
         height: u32,
-        font: FontArc,
+        font: Fonts,
         scale: PxScale,
     ) -> Result<Self, ImageRendererError> {
         let pixmap = Pixmap::new(width, height).ok_or(ImageRendererError::CanvasInitFailed)?;
         let image_for_text = RgbaImage::new(width, height);
-        let char_size = calculate_char_size(&font, scale);
+        let char_size = calculate_char_size(&font.regular, scale);
 
         Ok(Self {
             pixmap,
@@ -162,10 +167,56 @@ impl Canvas {
         text: &str,
         x: i32,
         y: i32,
-        color: Rgba<u8>,
-        background: Option<Rgba<u8>>,
+        color_palette: &[Rgba<u8>; 256],
+        attributes: &CellAttributes,
     ) {
-        if let Some(bg_color) = background {
+        let foreground_color = if attributes.reverse() {
+            color_palette[0]
+        } else {
+            resolve_rgba_with_palette(color_palette, attributes.foreground())
+                .unwrap_or(color_palette[7])
+        };
+
+        let is_bold = matches!(attributes.intensity(), Intensity::Bold);
+
+        let font = if is_bold && attributes.italic() {
+            &self.font.bold_italic
+        } else if is_bold {
+            &self.font.bold
+        } else if attributes.italic() {
+            &self.font.italic
+        } else {
+            &self.font.regular
+        };
+
+        draw_text_mut(
+            &mut self.image_for_text,
+            foreground_color,
+            x,
+            y,
+            self.scale,
+            &font,
+            text,
+        );
+
+        self.draw_cell_attributes(text, x, y, color_palette, attributes);
+    }
+
+    pub fn draw_cell_attributes(
+        &mut self,
+        text: &str,
+        x: i32,
+        y: i32,
+        color_palette: &[Rgba<u8>; 256],
+        attributes: &CellAttributes,
+    ) {
+        let bg_color = if attributes.reverse() {
+            resolve_rgba_with_palette(color_palette, attributes.foreground())
+                .or(Some(color_palette[7]))
+        } else {
+            resolve_rgba_with_palette(color_palette, attributes.background())
+        };
+        if let Some(bg_color) = bg_color {
             self.fill_rect(
                 x,
                 y,
@@ -175,15 +226,28 @@ impl Canvas {
             );
         }
 
-        draw_text_mut(
-            &mut self.image_for_text,
-            color,
-            x,
-            y,
-            self.scale,
-            &self.font,
-            text,
-        );
+        if attributes.underline() != Underline::None {
+            let underline_color =
+                resolve_rgba_with_palette(color_palette, attributes.underline_color())
+                    .unwrap_or(color_palette[7]);
+            self.fill_rect(
+                x,
+                y + self.char_height() as i32,
+                text.chars().count() as u32 * self.char_width(),
+                1,
+                underline_color,
+            );
+        }
+
+        if attributes.strikethrough() {
+            self.fill_rect(
+                x,
+                y + (self.char_height() as i32 / 2),
+                text.chars().count() as u32 * self.char_width(),
+                1,
+                color_palette[7],
+            );
+        }
     }
 
     pub fn width(&self) -> u32 {
@@ -229,13 +293,12 @@ impl Canvas {
 
 #[cfg(test)]
 mod tests {
-    use crate::window_decoration::common::default_font;
+    use crate::window_decoration::common::{default_font, get_default_color_palette};
 
     use super::*;
-    use ab_glyph::FontArc;
     use image::Rgba;
 
-    fn make_font() -> FontArc {
+    fn make_font() -> Fonts {
         default_font().unwrap().clone()
     }
 
@@ -267,8 +330,8 @@ mod tests {
             "Hello",
             5,
             5,
-            Rgba([0, 0, 0, 255]),
-            Some(Rgba([255, 255, 255, 255])),
+            &get_default_color_palette(),
+            &CellAttributes::default(),
         );
     }
 

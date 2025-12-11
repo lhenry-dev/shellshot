@@ -8,7 +8,6 @@ use unicode_width::UnicodeWidthChar;
 use crate::constants::{FONT_SIZE, IMAGE_QUALITY_MULTIPLIER};
 use crate::image_renderer::canvas::Canvas;
 use crate::image_renderer::render_size::{calculate_char_size, calculate_image_size};
-use crate::image_renderer::utils::resolve_rgba_with_palette;
 use crate::window_decoration::{WindowDecoration, WindowMetrics};
 
 pub mod canvas;
@@ -74,7 +73,7 @@ impl ImageRenderer {
         let font = window_decoration.font()?;
 
         let scale = PxScale::from((FONT_SIZE * IMAGE_QUALITY_MULTIPLIER) as f32);
-        let char_size = calculate_char_size(font, scale);
+        let char_size = calculate_char_size(&font.regular, scale);
         let command_line = window_decoration.build_command_line(&command.join(" "));
 
         let metrics = window_decoration.compute_metrics(char_size);
@@ -113,7 +112,6 @@ impl ImageRenderer {
             self.metrics.border_width + self.metrics.title_bar_height + self.metrics.padding;
 
         let color_palette = self.window_decoration.get_color_palette();
-        let default_fg_color = color_palette[7];
 
         let command_line = self
             .window_decoration
@@ -125,11 +123,9 @@ impl ImageRenderer {
             let x = i32::try_from(start_x + x_offset)?;
 
             let text = cell.str();
-            let color = resolve_rgba_with_palette(&color_palette, cell.attrs().foreground())
-                .unwrap_or(default_fg_color);
-            let background = resolve_rgba_with_palette(&color_palette, cell.attrs().background());
 
-            self.canvas.draw_text(text, x, y, color, background);
+            self.canvas
+                .draw_text(text, x, y, &color_palette, cell.attrs());
 
             let text_width = text
                 .chars()
@@ -147,7 +143,6 @@ impl ImageRenderer {
             self.metrics.border_width + self.metrics.title_bar_height + self.metrics.padding;
 
         let color_palette = self.window_decoration.get_color_palette();
-        let default_fg_color = color_palette[7];
 
         for (row_idx, line) in screen.screen_lines().iter().enumerate() {
             let row_idx = u32::try_from(row_idx + 1)?;
@@ -158,12 +153,9 @@ impl ImageRenderer {
                 let x = i32::try_from(start_x + x_offset)?;
 
                 let text = cell.str();
-                let color = resolve_rgba_with_palette(&color_palette, cell.attrs().foreground())
-                    .unwrap_or(default_fg_color);
-                let background =
-                    resolve_rgba_with_palette(&color_palette, cell.attrs().background());
 
-                self.canvas.draw_text(text, x, y, color, background);
+                self.canvas
+                    .draw_text(text, x, y, &color_palette, cell.attrs());
 
                 let text_width = text
                     .chars()
