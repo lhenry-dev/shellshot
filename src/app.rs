@@ -74,7 +74,7 @@ pub struct Args {
     #[arg(long, short = 'W', default_value = "auto")]
     pub width: Dimension,
 
-    /// Final image height in terminal lines, or 'auto'
+    /// Final image height in terminal rows, or 'auto'
     #[arg(long, short = 'H', default_value = "auto")]
     pub height: Dimension,
 

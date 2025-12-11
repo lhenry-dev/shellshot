@@ -1,4 +1,3 @@
-use ab_glyph::FontArc;
 use image::Rgba;
 use termwiz::cell::Cell;
 
@@ -8,6 +7,7 @@ use crate::image_renderer::ImageRendererError;
 use crate::window_decoration::common::default_build_command_line;
 use crate::window_decoration::common::default_font;
 use crate::window_decoration::common::get_default_color_palette;
+use crate::window_decoration::Fonts;
 use crate::window_decoration::WindowMetrics;
 
 use super::WindowDecoration;
@@ -34,7 +34,7 @@ impl WindowDecoration for NoDecoration {
         get_default_color_palette()
     }
 
-    fn font(&self) -> Result<&FontArc, ImageRendererError> {
+    fn font(&self) -> Result<Fonts, ImageRendererError> {
         default_font()
     }
 

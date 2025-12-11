@@ -38,7 +38,7 @@ impl TerminalBuilder {
         };
 
         terminal.run_loop()?;
-        match (rows, cols) {
+        match (cols, rows) {
             (Dimension::Auto, Dimension::Auto) => terminal.resize_surface(true, true),
             (Dimension::Auto, Dimension::Value(_)) => terminal.resize_surface(true, false),
             (Dimension::Value(_), Dimension::Auto) => terminal.resize_surface(false, true),
@@ -103,8 +103,15 @@ impl TerminalBuilder {
         let new_rows = if resize_rows {
             lines
                 .iter()
-                .rposition(|line| !line.is_whitespace())
-                .map_or(0, |idx| idx + 1)
+                .enumerate()
+                .rev()
+                .find(|(_, line)| {
+                    line.visible_cells().any(|cell| {
+                        !cell.str().chars().all(char::is_whitespace)
+                            || !matches!(cell.attrs().background(), ColorAttribute::Default)
+                    })
+                })
+                .map_or(0, |(idx, _)| idx + 1)
         } else {
             current_rows
         };
