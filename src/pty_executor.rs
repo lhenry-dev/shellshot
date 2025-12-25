@@ -66,6 +66,7 @@ pub struct PtyOptions {
     pub rows: Dimension,
     pub timeout: Option<Duration>,
     pub shell: bool,
+    pub quiet: bool,
 }
 
 pub struct PtyExecutor {}
@@ -141,9 +142,10 @@ impl PtyExecutor {
         let cols = &pty_options.cols;
         let rows = &pty_options.rows;
         let timeout = &pty_options.timeout;
+        let quiet = pty_options.quiet;
 
         thread::scope(|s| -> Result<Surface, PtyExecutorError> {
-            let handle = s.spawn(|| TerminalBuilder::run(pty_process, cols, rows));
+            let handle = s.spawn(|| TerminalBuilder::run(pty_process, cols, rows, quiet));
 
             with_timeout(*timeout, killer, s, || child.wait())??;
 
@@ -172,6 +174,7 @@ mod tests {
             rows: Dimension::Value(24),
             timeout: Some(Duration::from_secs(5)),
             shell: false,
+            quiet: true,
         }
     }
 
@@ -234,6 +237,7 @@ mod tests {
             rows: Dimension::Value(24),
             timeout: Some(Duration::from_millis(500)),
             shell: false,
+            quiet: true,
         };
 
         let command = if cfg!(windows) {

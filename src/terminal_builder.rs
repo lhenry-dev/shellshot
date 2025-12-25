@@ -1,3 +1,4 @@
+use indicatif::style::TemplateError;
 use std::io::{self, BufRead};
 use termwiz::color::ColorAttribute;
 use termwiz::escape::parser::Parser;
@@ -8,19 +9,24 @@ use crate::constants::{SCREEN_MAX_HEIGHT, SCREEN_MAX_WIDTH};
 use crate::pty_executor::dimension::Dimension;
 use crate::pty_executor::PtyIO;
 use crate::terminal_builder::action::process_action;
+use crate::terminal_builder::progress_bar::TerminalBuilderProgressBar;
 
 mod action;
+mod progress_bar;
 mod utils;
 
 #[derive(Debug, Error)]
 pub enum TerminalBuilderError {
     #[error("IO error: {0}")]
     IoError(#[from] io::Error),
+    #[error("Progress bar template error: {0}")]
+    ProgressTemplateError(#[from] TemplateError),
 }
 
 pub struct TerminalBuilder {
     pty_process: PtyIO,
     surface: Surface,
+    quiet: bool,
 }
 
 impl TerminalBuilder {
@@ -28,6 +34,7 @@ impl TerminalBuilder {
         pty_process: PtyIO,
         cols: &Dimension,
         rows: &Dimension,
+        quiet: bool,
     ) -> Result<Surface, TerminalBuilderError> {
         let mut terminal = Self {
             pty_process,
@@ -35,6 +42,7 @@ impl TerminalBuilder {
                 cols.to_u16(SCREEN_MAX_WIDTH).into(),
                 rows.to_u16(SCREEN_MAX_HEIGHT).into(),
             ),
+            quiet,
         };
 
         terminal.run_loop()?;
@@ -55,6 +63,8 @@ impl TerminalBuilder {
 
         let mut parser = Parser::new();
 
+        let pb = TerminalBuilderProgressBar::new(self.quiet)?;
+
         loop {
             let buf = reader.fill_buf()?;
             if buf.is_empty() {
@@ -65,6 +75,8 @@ impl TerminalBuilder {
             parser.parse(buf, |action| action.append_to(&mut actions));
 
             for action in actions {
+                pb.update_progress(&action);
+
                 let seq = process_action(surface, writer, &action);
                 surface.flush_changes_older_than(seq);
             }
@@ -73,6 +85,8 @@ impl TerminalBuilder {
             reader.consume(len);
         }
 
+        pb.finish();
+
         Ok(self.surface.clone())
     }
 
@@ -80,41 +94,30 @@ impl TerminalBuilder {
         let lines = self.surface.screen_lines();
         let (current_cols, current_rows) = self.surface.dimensions();
 
-        let new_cols = if resize_cols {
-            lines
-                .iter()
-                .map(|line| {
-                    let mut last_idx = 0;
-                    for cell in line.visible_cells() {
-                        if !(cell.str().chars().all(char::is_whitespace)
-                            && matches!(cell.attrs().background(), ColorAttribute::Default))
-                        {
-                            last_idx = cell.cell_index() + 1;
-                        }
-                    }
-                    last_idx
-                })
-                .max()
-                .unwrap_or(0)
-        } else {
-            current_cols
-        };
+        let mut max_col = 0;
+        let mut max_row = 0;
 
-        let new_rows = if resize_rows {
-            lines
-                .iter()
-                .enumerate()
-                .rev()
-                .find(|(_, line)| {
-                    line.visible_cells().any(|cell| {
-                        !cell.str().chars().all(char::is_whitespace)
-                            || !matches!(cell.attrs().background(), ColorAttribute::Default)
-                    })
-                })
-                .map_or(0, |(idx, _)| idx + 1)
-        } else {
-            current_rows
-        };
+        for (row_idx, line) in lines.iter().enumerate() {
+            let mut last_idx = 0;
+            for cell in line.visible_cells() {
+                let is_non_empty = !cell.str().chars().all(char::is_whitespace)
+                    || !matches!(cell.attrs().background(), ColorAttribute::Default);
+                if is_non_empty {
+                    last_idx = cell.cell_index() + 1;
+                }
+            }
+
+            if resize_cols {
+                max_col = max_col.max(last_idx);
+            }
+
+            if resize_rows && last_idx > 0 {
+                max_row = row_idx + 1;
+            }
+        }
+
+        let new_cols = if resize_cols { max_col } else { current_cols };
+        let new_rows = if resize_rows { max_row } else { current_rows };
 
         self.surface.resize(new_cols, new_rows);
     }
@@ -122,7 +125,10 @@ impl TerminalBuilder {
 
 #[cfg(test)]
 mod tests {
-    use termwiz::surface::Change;
+    use termwiz::{
+        cell::AttributeChange,
+        surface::{Change, Position},
+    };
 
     use super::*;
     use crate::pty_executor::writer::DetachableWriter;
@@ -141,17 +147,18 @@ mod tests {
         let content = b"Hello, Terminal!";
         let pty_process = create_mock_pty(content);
 
-        // Utiliser des dimensions fixes
-        let surface =
-            TerminalBuilder::run(pty_process, &Dimension::Value(10), &Dimension::Value(5))
-                .expect("TerminalBuilder should run");
+        let surface = TerminalBuilder::run(
+            pty_process,
+            &Dimension::Value(10),
+            &Dimension::Value(5),
+            true,
+        )
+        .expect("TerminalBuilder should run");
 
-        // Vérifie les dimensions
         let (cols, rows) = surface.dimensions();
         assert_eq!(cols, 10);
         assert_eq!(rows, 5);
 
-        // Vérifie que du texte a été écrit
         let first_line: String = surface.screen_lines()[0]
             .visible_cells()
             .map(|c| c.str().to_string())
@@ -165,6 +172,7 @@ mod tests {
         let mut builder = TerminalBuilder {
             pty_process,
             surface: Surface::new(5, 5),
+            quiet: true,
         };
 
         let result = builder.run_loop();
@@ -176,17 +184,76 @@ mod tests {
     }
 
     #[test]
-    fn test_resize_surface_auto() {
+    fn test_resize_surface() {
         let mut surface = Surface::new(10, 5);
-        surface.add_change(Change::Text("X".to_string()));
+
+        surface.add_change(Change::Text("ABC    ".to_string()));
+        surface.add_change(Change::CursorPosition {
+            x: Position::Absolute(0),
+            y: Position::Relative(1),
+        });
+
+        surface.add_change(Change::Text("       ".to_string()));
+        surface.add_change(Change::CursorPosition {
+            x: Position::Absolute(0),
+            y: Position::Relative(1),
+        });
+
         let mut builder = TerminalBuilder {
             pty_process: create_mock_pty(b""),
             surface,
+            quiet: true,
         };
 
         builder.resize_surface(true, true);
+
         let (new_cols, new_rows) = builder.surface.dimensions();
-        assert!(new_cols > 0);
-        assert!(new_rows > 0);
+
+        assert_eq!(new_cols, 3, "Expected 3 columns");
+        assert_eq!(new_rows, 1, "Expected 1 rows");
+    }
+
+    #[test]
+    fn test_resize_surface_with_colored_background_exact() {
+        let mut surface = Surface::new(10, 5);
+
+        surface.add_change(Change::Attribute(AttributeChange::Background(
+            ColorAttribute::PaletteIndex(7),
+        )));
+        surface.add_change(Change::Text("   ".to_string()));
+        surface.add_change(Change::CursorPosition {
+            x: Position::Absolute(0),
+            y: Position::Relative(1),
+        });
+
+        surface.add_change(Change::Text("X".to_string()));
+        surface.add_change(Change::CursorPosition {
+            x: Position::Absolute(0),
+            y: Position::Relative(1),
+        });
+
+        surface.add_change(Change::Text("  ".to_string()));
+        surface.add_change(Change::CursorPosition {
+            x: Position::Absolute(0),
+            y: Position::Relative(1),
+        });
+
+        surface.add_change(Change::Attribute(AttributeChange::Background(
+            ColorAttribute::Default,
+        )));
+        surface.add_change(Change::Text("   ".to_string()));
+
+        let mut builder = TerminalBuilder {
+            pty_process: create_mock_pty(b""),
+            surface,
+            quiet: true,
+        };
+
+        builder.resize_surface(true, true);
+
+        let (new_cols, new_rows) = builder.surface.dimensions();
+
+        assert_eq!(new_cols, 3, "Expected 3 columns");
+        assert_eq!(new_rows, 3, "Expected 3 rows");
     }
 }
