@@ -97,13 +97,12 @@ pub struct Args {
 /// - Image rendering fails
 /// - Saving the image fails
 pub fn run_shellshot(args: Args) -> Result<(), ShellshotError> {
-    info!("Starting shellshot v{}", env!("CARGO_PKG_VERSION"));
-
     let pty_options = PtyOptions {
         cols: args.width,
         rows: args.height,
         timeout: args.timeout.map(Duration::from_secs),
         shell: args.shell,
+        quiet: args.quiet,
     };
 
     let screen = PtyExecutor::run_command(&pty_options, &args.command)?;
@@ -128,6 +127,8 @@ pub fn run_shellshot(args: Args) -> Result<(), ShellshotError> {
 
 #[cfg(test)]
 mod tests {
+    use tempfile::tempdir;
+
     use super::*;
 
     #[test]
@@ -140,12 +141,15 @@ mod tests {
             base_command
         };
 
+        let tmp = tempdir().unwrap();
+        let nested = tmp.path().join("nested/folder/test.png");
+
         let args = Args {
             command,
-            quiet: false,
+            quiet: true,
             no_decoration: false,
             decoration: WindowDecorationType::Classic,
-            output: Some("test.png".into()),
+            output: Some(nested.to_str().unwrap().to_string()),
             clipboard: false,
             width: Dimension::Auto,
             height: Dimension::Auto,
@@ -155,5 +159,6 @@ mod tests {
 
         let result = run_shellshot(args);
         assert!(result.is_ok());
+        assert!(nested.exists());
     }
 }
