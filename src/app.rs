@@ -7,9 +7,9 @@ use tracing::info;
 use crate::{
     image_generator::{self, SaveError},
     image_renderer::{ImageRenderer, ImageRendererError},
-    pty_executor::{dimension::Dimension, PtyExecutor, PtyExecutorError, PtyOptions},
+    pty_executor::{PtyExecutor, PtyExecutorError, PtyOptions, dimension::Dimension},
     terminal_builder::TerminalBuilderError,
-    window_decoration::{create_window_decoration, WindowDecorationType},
+    window_decoration::{WindowDecorationType, create_window_decoration},
 };
 
 /// Errors that can occur in `shellshot`

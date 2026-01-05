@@ -1,5 +1,5 @@
 use crate::{
-    image_renderer::{canvas::Canvas, render_size::Size, ImageRendererError},
+    image_renderer::{ImageRendererError, canvas::Canvas, render_size::Size},
     window_decoration::no_decoration::NoDecoration,
 };
 

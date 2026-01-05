@@ -5,10 +5,10 @@ use termwiz::{
     cell::AttributeChange,
     color::ColorAttribute,
     escape::{
-        osc::{ColorOrQuery, DynamicColorNumber},
         OperatingSystemCommand,
+        osc::{ColorOrQuery, DynamicColorNumber},
     },
-    surface::{Change, SequenceNo, Surface, SEQ_ZERO},
+    surface::{Change, SEQ_ZERO, SequenceNo, Surface},
 };
 
 pub fn process_operating_system_command(
@@ -136,8 +136,8 @@ fn color_or_query(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use termwiz::escape::osc::{ColorOrQuery, DynamicColorNumber};
     use termwiz::escape::OperatingSystemCommand;
+    use termwiz::escape::osc::{ColorOrQuery, DynamicColorNumber};
     use termwiz::{
         color::{ColorAttribute, SrgbaTuple},
         surface::Surface,

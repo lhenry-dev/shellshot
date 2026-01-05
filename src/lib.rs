@@ -11,5 +11,5 @@ mod pty_executor;
 mod terminal_builder;
 mod window_decoration;
 
-pub use app::{run_shellshot, Args};
+pub use app::{Args, run_shellshot};
 pub use window_decoration::WindowDecorationType;

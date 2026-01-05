@@ -1,8 +1,8 @@
 use crate::{
     image_renderer::{
-        render_size::{calculate_char_size, Size},
-        utils::resolve_rgba_with_palette,
         ImageRendererError,
+        render_size::{Size, calculate_char_size},
+        utils::resolve_rgba_with_palette,
     },
     window_decoration::Fonts,
 };

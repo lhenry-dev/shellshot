@@ -6,8 +6,8 @@ use termwiz::surface::Surface;
 use thiserror::Error;
 
 use crate::constants::{SCREEN_MAX_HEIGHT, SCREEN_MAX_WIDTH};
-use crate::pty_executor::dimension::Dimension;
 use crate::pty_executor::PtyIO;
+use crate::pty_executor::dimension::Dimension;
 use crate::terminal_builder::action::process_action;
 use crate::terminal_builder::progress_bar::TerminalBuilderProgressBar;
 
@@ -131,8 +131,8 @@ mod tests {
     };
 
     use super::*;
-    use crate::pty_executor::writer::DetachableWriter;
     use crate::pty_executor::PtyIO;
+    use crate::pty_executor::writer::DetachableWriter;
     use std::io::{self, BufReader, Cursor};
 
     fn create_mock_pty(content: &[u8]) -> PtyIO {

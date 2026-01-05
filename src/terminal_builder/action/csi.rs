@@ -1,8 +1,8 @@
 use std::io::{self};
 
 use termwiz::{
-    escape::{csi::Edit, CSI},
-    surface::{Change, Position, SequenceNo, Surface, SEQ_ZERO},
+    escape::{CSI, csi::Edit},
+    surface::{Change, Position, SEQ_ZERO, SequenceNo, Surface},
 };
 
 mod cursor;
@@ -53,8 +53,8 @@ mod tests {
     use termwiz::{
         cell::Intensity,
         escape::{
-            csi::{Cursor as CsiCursor, Sgr},
             CSI,
+            csi::{Cursor as CsiCursor, Sgr},
         },
         surface::Surface,
     };

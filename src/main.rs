@@ -1,5 +1,5 @@
 use clap::Parser;
-use shellshot::{run_shellshot, Args};
+use shellshot::{Args, run_shellshot};
 use tracing::warn;
 
 fn main() {

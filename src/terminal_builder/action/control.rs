@@ -1,6 +1,6 @@
 use termwiz::{
     escape::ControlCode,
-    surface::{Change, Position, SequenceNo, Surface, SEQ_ZERO},
+    surface::{Change, Position, SEQ_ZERO, SequenceNo, Surface},
 };
 
 pub fn process_control(surface: &mut Surface, control_code: ControlCode) -> SequenceNo {

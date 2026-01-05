@@ -4,8 +4,8 @@ use std::{
 };
 
 use termwiz::{
-    escape::{csi::Cursor, OneBased, CSI},
-    surface::{Change, Position, SequenceNo, Surface, SEQ_ZERO},
+    escape::{CSI, OneBased, csi::Cursor},
+    surface::{Change, Position, SEQ_ZERO, SequenceNo, Surface},
 };
 use tracing::warn;
 
@@ -136,8 +136,8 @@ pub fn process_cursor(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use termwiz::escape::csi::Cursor as CsiCursor;
     use termwiz::escape::OneBased;
+    use termwiz::escape::csi::Cursor as CsiCursor;
     use termwiz::surface::{Change, Position, SequenceNo};
 
     fn make_surface() -> Surface {

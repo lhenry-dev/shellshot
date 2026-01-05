@@ -2,7 +2,7 @@ use std::io::{self};
 
 use termwiz::{
     escape::Action,
-    surface::{SequenceNo, Surface, SEQ_ZERO},
+    surface::{SEQ_ZERO, SequenceNo, Surface},
 };
 use tracing::debug;
 

@@ -1,6 +1,6 @@
 use std::sync::{
-    mpsc::{channel, Sender},
     Arc, Mutex, MutexGuard,
+    mpsc::{Sender, channel},
 };
 
 #[derive(Clone)]

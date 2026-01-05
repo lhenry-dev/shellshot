@@ -1,7 +1,7 @@
 use termwiz::{
     cell::{AttributeChange, CellAttributes},
     escape::csi::Sgr,
-    surface::{Change, SequenceNo, Surface, SEQ_ZERO},
+    surface::{Change, SEQ_ZERO, SequenceNo, Surface},
 };
 
 pub fn process_sgr(surface: &mut Surface, sgr: &Sgr) -> SequenceNo {
