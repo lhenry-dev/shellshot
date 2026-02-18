@@ -1,5 +1,23 @@
+use ab_glyph::FontArc;
 use image::Rgba;
-use termwiz::color::ColorAttribute;
+use termwiz::{
+    cell::{CellAttributes, Intensity},
+    color::ColorAttribute,
+};
+
+use crate::window_decoration::Fonts;
+
+pub fn select_font(font: &Fonts, attributes: &CellAttributes) -> FontArc {
+    match (
+        matches!(attributes.intensity(), Intensity::Bold),
+        attributes.italic(),
+    ) {
+        (true, true) => font.bold_italic.clone(),
+        (true, false) => font.bold.clone(),
+        (false, true) => font.italic.clone(),
+        (false, false) => font.regular.clone(),
+    }
+}
 
 pub fn resolve_rgba_with_palette(
     color_palette: &[Rgba<u8>; 256],
@@ -20,6 +38,39 @@ pub fn resolve_rgba_with_palette(
             (c.2 * 255.0).round() as u8,
             (c.3 * 255.0).round() as u8,
         ])),
+    }
+}
+
+pub fn resolve_foreground_color(
+    attributes: &CellAttributes,
+    palette: &[Rgba<u8>; 256],
+) -> Rgba<u8> {
+    let mut color = if attributes.reverse() {
+        palette[0]
+    } else {
+        resolve_rgba_with_palette(palette, attributes.foreground()).unwrap_or(palette[7])
+    };
+
+    if matches!(attributes.intensity(), Intensity::Half) {
+        color = Rgba([
+            (color[0] as f32 * 0.5) as u8,
+            (color[1] as f32 * 0.5) as u8,
+            (color[2] as f32 * 0.5) as u8,
+            color[3],
+        ]);
+    }
+
+    color
+}
+
+pub fn resolve_background_color(
+    attributes: &CellAttributes,
+    palette: &[Rgba<u8>; 256],
+) -> Option<Rgba<u8>> {
+    if attributes.reverse() {
+        resolve_rgba_with_palette(palette, attributes.foreground()).or(Some(palette[7]))
+    } else {
+        resolve_rgba_with_palette(palette, attributes.background())
     }
 }
 
