@@ -9,6 +9,7 @@ mod image_generator;
 mod image_renderer;
 mod pty_executor;
 mod terminal_builder;
+mod theme;
 mod window_decoration;
 
 pub use app::{Args, run_shellshot};

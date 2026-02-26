@@ -8,7 +8,7 @@ pub enum SaveError {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
-    #[error("Failed to decode image")]
+    #[error("Failed to decode image: {0}")]
     ImageDecode(#[from] image::ImageError),
 
     #[error("Clipboard error: {0}")]
@@ -111,8 +111,7 @@ mod tests {
 
         if let Err(SaveError::Clipboard(err)) = &result {
             match err {
-                arboard::Error::ClipboardNotSupported => return,
-                arboard::Error::Unknown { .. } => return,
+                arboard::Error::ClipboardNotSupported | arboard::Error::Unknown { .. } => return,
                 _ => panic!("Unexpected clipboard error: {err:?}"),
             }
         }

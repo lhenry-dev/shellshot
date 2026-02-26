@@ -99,7 +99,7 @@ shellshot --shell -o out.png echo "Hello from ShellShot!"
 Remove window decorations (title bar and control buttons):
 
 ```bash
-shellshot -o out.png --no-decoration node --version
+shellshot -o out.png --no-decoration rustc --version
 ```
 
 #### `--decoration <style>` / `-d`
@@ -111,6 +111,25 @@ Specify the decoration style (default: `classic`):
 shellshot -o out.png --decoration classic ls --color=always
 # Windows
 shellshot --shell -o out.png --decoration classic dir
+```
+
+#### --theme <file|url>
+
+Shellshot supports custom themes (Base16 `.yaml` or iTerm2 `.itermcolors`) that affect ANSI color rendering.
+
+Popular sources for themes:
+
+- [iTerm2-Color-Schemes](https://github.com/mbadolato/iTerm2-Color-Schemes#screenshots)
+- [base16](https://github.com/chriskempson/base16-schemes-source)
+
+You can load themes from a **local path** or a **URL**:
+
+```bash
+# Local Base16 theme
+shellshot --theme path/to/theme.yaml -o out.png rustc --version
+
+# From URL (iTerm2)
+shellshot --theme https://example.com/theme.itermcolors -o out.png rustc --version
 ```
 
 #### `--output` / `-o`

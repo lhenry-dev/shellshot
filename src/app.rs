@@ -9,6 +9,7 @@ use crate::{
     image_renderer::{ImageRenderer, ImageRendererError},
     pty_executor::{PtyExecutor, PtyExecutorError, PtyOptions, dimension::Dimension},
     terminal_builder::TerminalBuilderError,
+    theme::{Theme, ThemeError},
     window_decoration::{WindowDecorationType, create_window_decoration},
 };
 
@@ -17,13 +18,12 @@ use crate::{
 pub enum ShellshotError {
     #[error("Failed to execute command: {0}")]
     CommandExecution(#[from] PtyExecutorError),
-
+    #[error("Failed to load theme: {0}")]
+    ThemeError(#[from] ThemeError),
     #[error("Failed to build terminal from output: {0}")]
     TerminalBuild(#[from] TerminalBuilderError),
-
     #[error("Failed to render image: {0}")]
     ImageRender(#[from] ImageRendererError),
-
     #[error("Failed to save image to file: {0}")]
     Save(#[from] SaveError),
 }
@@ -61,6 +61,22 @@ pub struct Args {
         conflicts_with = "no_decoration"
     )]
     pub decoration: WindowDecorationType,
+
+    /// Path or URL to a theme file.
+    ///
+    /// Supported formats:
+    /// - Base16 YAML (`.yaml` / `.yml`)
+    /// - iTerm2 colors (`.itermcolors`)
+    ///
+    /// If not provided, the default ANSI 256-color theme will be used.
+    ///
+    /// Examples:
+    /// ```text
+    /// --theme /path/to/my-theme.yaml
+    /// --theme https://example.com/themes/dark.itermcolors
+    /// ```
+    #[arg(long)]
+    pub theme: Option<String>,
 
     /// Specify output filename
     #[arg(long, short = 'o', conflicts_with = "clipboard")]
@@ -105,12 +121,18 @@ pub fn run_shellshot(args: Args) -> Result<(), ShellshotError> {
         quiet: args.quiet,
     };
 
-    let screen = PtyExecutor::run_command(&pty_options, &args.command)?;
-
     let decoration = (!args.no_decoration).then_some(args.decoration);
     let window_decoration = create_window_decoration(decoration.as_ref());
 
-    let image_data = ImageRenderer::render_image(&args.command, &screen, window_decoration)?;
+    let theme = if let Some(theme_source) = args.theme {
+        Theme::load(&theme_source)?
+    } else {
+        Theme::default()
+    };
+
+    let screen = PtyExecutor::run_command(&pty_options, &args.command)?;
+
+    let image_data = ImageRenderer::render_image(&args.command, &screen, window_decoration, theme)?;
 
     if args.clipboard {
         image_generator::save_to_clipboard(&image_data)?;
@@ -149,6 +171,7 @@ mod tests {
             quiet: true,
             no_decoration: false,
             decoration: WindowDecorationType::Classic,
+            theme: None,
             output: Some(nested.to_str().unwrap().to_string()),
             clipboard: false,
             width: Dimension::Auto,

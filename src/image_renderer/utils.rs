@@ -5,7 +5,7 @@ use termwiz::{
     color::ColorAttribute,
 };
 
-use crate::window_decoration::Fonts;
+use crate::{theme::Theme, window_decoration::Fonts};
 
 pub fn select_font(font: &Fonts, attributes: &CellAttributes) -> FontArc {
     match (
@@ -41,14 +41,12 @@ pub fn resolve_rgba_with_palette(
     }
 }
 
-pub fn resolve_foreground_color(
-    attributes: &CellAttributes,
-    palette: &[Rgba<u8>; 256],
-) -> Rgba<u8> {
+pub fn resolve_foreground_color(attributes: &CellAttributes, theme: &Theme) -> Rgba<u8> {
     let mut color = if attributes.reverse() {
-        palette[0]
+        theme.background_color
     } else {
-        resolve_rgba_with_palette(palette, attributes.foreground()).unwrap_or(palette[7])
+        resolve_rgba_with_palette(&theme.palette, attributes.foreground())
+            .unwrap_or(theme.foreground_color)
     };
 
     if matches!(attributes.intensity(), Intensity::Half) {
@@ -63,15 +61,29 @@ pub fn resolve_foreground_color(
     color
 }
 
-pub fn resolve_background_color(
-    attributes: &CellAttributes,
-    palette: &[Rgba<u8>; 256],
-) -> Option<Rgba<u8>> {
+pub fn resolve_background_color(attributes: &CellAttributes, theme: &Theme) -> Option<Rgba<u8>> {
     if attributes.reverse() {
-        resolve_rgba_with_palette(palette, attributes.foreground()).or(Some(palette[7]))
+        resolve_rgba_with_palette(&theme.palette, attributes.foreground())
+            .or(Some(theme.foreground_color))
     } else {
-        resolve_rgba_with_palette(palette, attributes.background())
+        resolve_rgba_with_palette(&theme.palette, attributes.background())
     }
+}
+
+pub fn darken_color(color: Rgba<u8>, amount: f32) -> Rgba<u8> {
+    // amount between 0.0 and 1.0: higher = darker
+    let r = (color.0[0] as f32 * (1.0 - amount)).round() as u8;
+    let g = (color.0[1] as f32 * (1.0 - amount)).round() as u8;
+    let b = (color.0[2] as f32 * (1.0 - amount)).round() as u8;
+    Rgba([r, g, b, color.0[3]])
+}
+
+pub fn lighten_color(color: Rgba<u8>, amount: f32) -> Rgba<u8> {
+    // amount between 0.0 and 1.0: higher = lighter
+    let r = ((255.0 - color.0[0] as f32).mul_add(amount, color.0[0] as f32)).round() as u8;
+    let g = ((255.0 - color.0[1] as f32).mul_add(amount, color.0[1] as f32)).round() as u8;
+    let b = ((255.0 - color.0[2] as f32).mul_add(amount, color.0[2] as f32)).round() as u8;
+    Rgba([r, g, b, color.0[3]])
 }
 
 #[cfg(test)]

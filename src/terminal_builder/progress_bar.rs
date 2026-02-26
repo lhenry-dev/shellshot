@@ -11,16 +11,13 @@ pub struct TerminalBuilderProgressBar {
 
 impl TerminalBuilderProgressBar {
     pub fn new(quiet: bool) -> Result<Self, TerminalBuilderError> {
-        let progress_bar = match quiet {
-            true => None,
-            false => {
-                let pb = ProgressBar::new_spinner();
-                pb.set_style(
-                    ProgressStyle::default_spinner().template("{spinner} Parsing: {msg}")?,
-                );
-                pb.enable_steady_tick(Duration::from_millis(80));
-                Some(pb)
-            }
+        let progress_bar = if quiet {
+            None
+        } else {
+            let pb = ProgressBar::new_spinner();
+            pb.set_style(ProgressStyle::default_spinner().template("{spinner} Parsing: {msg}")?);
+            pb.enable_steady_tick(Duration::from_millis(80));
+            Some(pb)
         };
         Ok(Self { progress_bar })
     }

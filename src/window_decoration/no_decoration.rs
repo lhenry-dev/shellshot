@@ -1,14 +1,13 @@
-use image::Rgba;
 use termwiz::cell::Cell;
 
 use crate::image_renderer::ImageRendererError;
 use crate::image_renderer::canvas::Canvas;
 use crate::image_renderer::render_size::Size;
+use crate::theme::Theme;
 use crate::window_decoration::Fonts;
 use crate::window_decoration::WindowMetrics;
 use crate::window_decoration::common::default_build_command_line;
 use crate::window_decoration::common::default_font;
-use crate::window_decoration::common::get_default_color_palette;
 
 use super::WindowDecoration;
 
@@ -30,10 +29,6 @@ impl WindowDecoration for NoDecoration {
         }
     }
 
-    fn get_color_palette(&self) -> [Rgba<u8>; 256] {
-        get_default_color_palette()
-    }
-
     fn font(&self) -> Result<Fonts, ImageRendererError> {
         default_font()
     }
@@ -42,9 +37,9 @@ impl WindowDecoration for NoDecoration {
         &self,
         canvas: &mut Canvas,
         _metrics: &WindowMetrics,
+        theme: &Theme,
     ) -> Result<(), ImageRendererError> {
-        let bg_color = self.get_color_palette()[0];
-        canvas.fill(bg_color);
+        canvas.fill(theme.background_color);
         Ok(())
     }
 }

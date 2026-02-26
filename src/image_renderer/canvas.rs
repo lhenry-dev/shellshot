@@ -7,6 +7,7 @@ use crate::{
             select_font,
         },
     },
+    theme::Theme,
     window_decoration::Fonts,
 };
 use ab_glyph::Font;
@@ -15,7 +16,7 @@ use ab_glyph::ScaleFont;
 use image::{Rgba, RgbaImage};
 use imageproc::drawing::draw_text_mut;
 use termwiz::cell::{CellAttributes, Underline};
-use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Rect, Transform};
+use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Rect, Stroke, Transform};
 use tracing::warn;
 
 bitflags::bitflags! {
@@ -152,7 +153,7 @@ impl Canvas {
         );
     }
 
-    pub fn draw_circle(&mut self, x: i32, y: i32, radius: i32, color: Rgba<u8>) {
+    pub fn fill_circle(&mut self, x: i32, y: i32, radius: i32, color: Rgba<u8>) {
         if let Some(path) = PathBuilder::from_circle(x as f32, y as f32, radius as f32) {
             let mut paint = Paint::default();
             paint.set_color(Color::from_rgba8(color[0], color[1], color[2], color[3]));
@@ -167,15 +168,59 @@ impl Canvas {
         }
     }
 
+    pub fn draw_line(
+        &mut self,
+        x1: u32,
+        y1: u32,
+        x2: u32,
+        y2: u32,
+        thickness: u32,
+        color: Rgba<u8>,
+    ) {
+        let mut pb = PathBuilder::new();
+        pb.move_to(x1 as f32, y1 as f32);
+        pb.line_to(x2 as f32, y2 as f32);
+
+        let Some(path) = pb.finish() else {
+            return;
+        };
+
+        let mut paint = Paint::default();
+        paint.set_color(Color::from_rgba8(color[0], color[1], color[2], color[3]));
+
+        let stroke = Stroke {
+            width: thickness as f32,
+            ..Default::default()
+        };
+
+        self.background
+            .stroke_path(&path, &paint, &stroke, Transform::identity(), None);
+    }
+
+    pub fn draw_rect_outline(
+        &mut self,
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+        thickness: u32,
+        color: Rgba<u8>,
+    ) {
+        self.draw_line(x, y, x + width, y, thickness, color);
+        self.draw_line(x, y + height, x + width, y + height, thickness, color);
+        self.draw_line(x, y, x, y + height, thickness, color);
+        self.draw_line(x + width, y, x + width, y + height, thickness, color);
+    }
+
     pub fn draw_text(
         &mut self,
         text: &str,
         x: i32,
         y: i32,
-        color_palette: &[Rgba<u8>; 256],
+        theme: &Theme,
         attributes: &CellAttributes,
     ) {
-        let fg_color = resolve_foreground_color(attributes, color_palette);
+        let fg_color = resolve_foreground_color(attributes, theme);
         let font = select_font(&self.font, attributes);
 
         draw_text_mut(
@@ -188,7 +233,7 @@ impl Canvas {
             text,
         );
 
-        self.draw_cell_attributes(text, x, y, &font, fg_color, color_palette, attributes);
+        self.draw_cell_attributes(text, x, y, &font, fg_color, theme, attributes);
     }
 
     #[expect(clippy::too_many_arguments)]
@@ -199,11 +244,11 @@ impl Canvas {
         y: i32,
         font: &impl Font,
         fg_color: Rgba<u8>,
-        color_palette: &[Rgba<u8>; 256],
+        theme: &Theme,
         attributes: &CellAttributes,
     ) {
         let width = text.chars().count() as u32 * self.char_width();
-        if let Some(bg_color) = resolve_background_color(attributes, color_palette) {
+        if let Some(bg_color) = resolve_background_color(attributes, theme) {
             self.fill_rect(x, y, width, self.char_height(), bg_color);
         }
 
@@ -212,16 +257,17 @@ impl Canvas {
         let thickness = (self.scale.y * 0.07).max(1.0) as u32;
 
         let underline_color =
-            resolve_rgba_with_palette(color_palette, attributes.underline_color())
+            resolve_rgba_with_palette(&theme.palette, attributes.underline_color())
                 .unwrap_or(fg_color);
 
         if attributes.underline() != Underline::None {
-            let underline_y = baseline + scaled_font.descent().abs() * 0.3;
+            let underline_y = scaled_font.descent().abs().mul_add(0.3, baseline);
             self.fill_rect(x, underline_y as i32, width, thickness, underline_color);
         }
 
         if attributes.strikethrough() {
-            let strike_y = baseline - (scaled_font.ascent() - scaled_font.descent().abs()) * 0.5;
+            let strike_y =
+                (scaled_font.ascent() - scaled_font.descent().abs()).mul_add(-0.5, baseline);
             self.fill_rect(x, strike_y as i32, width, thickness, underline_color);
         }
     }
@@ -268,13 +314,13 @@ impl Canvas {
 
 #[cfg(test)]
 mod tests {
-    use crate::window_decoration::common::{default_font, get_default_color_palette};
+    use crate::window_decoration::common::default_font;
 
     use super::*;
     use image::Rgba;
 
     fn make_font() -> Fonts {
-        default_font().unwrap().clone()
+        default_font().unwrap()
     }
 
     #[test]
@@ -292,22 +338,31 @@ mod tests {
         let font = make_font();
         let mut c = Canvas::new(50, 30, font, 12.0.into()).unwrap();
         c.fill(Rgba([255, 0, 0, 255]));
-        c.fill_rect(5, 5, 10, 10, Rgba([0, 255, 0, 255]));
         c.fill_rounded(Rgba([0, 0, 255, 255]), 5.0, &Corners::ALL);
+        c.fill_rect(5, 5, 10, 10, Rgba([0, 255, 0, 255]));
+        c.fill_rounded_rect(5, 5, 10, 10, Rgba([0, 255, 0, 255]), 5.0, &Corners::ALL);
+        c.fill_circle(20, 20, 10, Rgba([255, 255, 0, 255]));
+
+        let img = c.to_final_image().unwrap();
+        assert_eq!(img.width(), 50);
+        assert_eq!(img.height(), 30);
     }
 
     #[test]
     fn draw_shapes_and_text() {
+        let theme = Theme::default();
         let font = make_font();
-        let mut c = Canvas::new(60, 40, font, 12.0.into()).unwrap();
-        c.draw_circle(20, 20, 10, Rgba([255, 255, 0, 255]));
-        c.draw_text(
-            "Hello",
-            5,
-            5,
-            &get_default_color_palette(),
-            &CellAttributes::default(),
-        );
+        let mut c = Canvas::new(100, 60, font, 12.0.into()).unwrap();
+
+        let color = Rgba([255, 255, 255, 255]);
+
+        c.draw_text("Hello", 5, 5, &theme, &CellAttributes::default());
+        c.draw_rect_outline(10, 20, 40, 20, 2, color);
+        c.draw_line(10, 50, 90, 50, 2, color);
+
+        let img = c.to_final_image().unwrap();
+        assert_eq!(img.width(), 100);
+        assert_eq!(img.height(), 60);
     }
 
     #[test]

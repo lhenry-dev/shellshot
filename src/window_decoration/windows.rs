@@ -1,4 +1,3 @@
-use image::Rgba;
 use termwiz::cell::Cell;
 
 use crate::{
@@ -6,7 +5,7 @@ use crate::{
         ImageRendererError,
         canvas::{Canvas, Corners},
         render_size::Size,
-        utils::{darken_color, lighten_color},
+        utils::darken_color,
     },
     theme::Theme,
     window_decoration::{
@@ -18,13 +17,9 @@ use crate::{
 use super::WindowDecoration;
 
 #[derive(Debug)]
-pub struct Classic;
+pub struct Windows;
 
-const GREEN: Rgba<u8> = Rgba([52, 199, 89, 255]);
-const YELLOW: Rgba<u8> = Rgba([255, 189, 45, 255]);
-const RED: Rgba<u8> = Rgba([255, 95, 87, 255]);
-
-impl WindowDecoration for Classic {
+impl WindowDecoration for Windows {
     fn build_command_line(&self, command: &str) -> Vec<Cell> {
         default_build_command_line(command)
     }
@@ -33,8 +28,8 @@ impl WindowDecoration for Classic {
         let char_height = char_size.height;
 
         let padding = char_height;
-        let border_width = 1;
-        let title_bar_height = char_height;
+        let border_width = 0;
+        let title_bar_height = char_height + char_height / 2;
 
         WindowMetrics {
             padding,
@@ -64,13 +59,6 @@ fn draw_window_decorations(
 ) -> Result<(), ImageRendererError> {
     let bg_color = theme.background_color;
     let title_bar_color = darken_color(bg_color, 0.2); // 20% darker than background
-    let border_color = lighten_color(bg_color, 0.2); // 20% lighter than background
-
-    canvas.fill_rounded(
-        border_color,
-        metrics.title_bar_height as f32 / 4.0,
-        &Corners::ALL,
-    );
 
     canvas.fill_rounded_rect(
         i32::try_from(metrics.border_width)?,
@@ -78,7 +66,7 @@ fn draw_window_decorations(
         canvas.width() - 2 * metrics.border_width,
         canvas.height() - 2 * metrics.border_width,
         bg_color,
-        metrics.title_bar_height as f32 / 4.0,
+        6.0,
         &Corners::ALL,
     );
 
@@ -88,28 +76,65 @@ fn draw_window_decorations(
         canvas.width() - 2 * metrics.border_width,
         metrics.title_bar_height,
         title_bar_color,
-        metrics.title_bar_height as f32 / 4.0,
+        6.0,
         &(Corners::TOP_LEFT | Corners::TOP_RIGHT),
     );
 
-    draw_window_buttons(canvas, metrics)
-}
-
-fn draw_window_buttons(
-    canvas: &mut Canvas,
-    metrics: &WindowMetrics,
-) -> Result<(), ImageRendererError> {
-    let btn_y = i32::try_from(metrics.border_width + (metrics.title_bar_height / 2))?;
-    let radius = i32::try_from(metrics.title_bar_height / 4)?;
-    let spacing = radius * 3;
-
-    let right = i32::try_from(canvas.width() - metrics.border_width)?;
-
-    canvas.fill_circle(right - spacing, btn_y, radius, RED);
-
-    canvas.fill_circle(right - 2 * spacing, btn_y, radius, YELLOW);
-
-    canvas.fill_circle(right - 3 * spacing, btn_y, radius, GREEN);
+    draw_window_buttons(canvas, metrics, theme);
 
     Ok(())
+}
+
+fn draw_window_buttons(canvas: &mut Canvas, metrics: &WindowMetrics, theme: &Theme) {
+    let btn_size = metrics.title_bar_height;
+    let top = metrics.border_width;
+    let spacing = btn_size + btn_size / 5;
+
+    let right = canvas.width() - metrics.border_width;
+
+    let close_x = right - btn_size;
+    let max_x = right - spacing - btn_size;
+    let min_x = right - 2 * spacing - btn_size;
+
+    let pad = btn_size / 3;
+    let thickness = (btn_size / 12).max(1);
+    let icon_color = theme.foreground_color;
+
+    // --- Close (X) ---
+    canvas.draw_line(
+        close_x + pad,
+        top + pad,
+        close_x + btn_size - pad,
+        top + btn_size - pad,
+        thickness,
+        icon_color,
+    );
+    canvas.draw_line(
+        close_x + btn_size - pad,
+        top + pad,
+        close_x + pad,
+        top + btn_size - pad,
+        thickness,
+        icon_color,
+    );
+
+    // --- Maximize (□) ---
+    canvas.draw_rect_outline(
+        max_x + pad,
+        top + pad,
+        btn_size - pad * 2,
+        btn_size - pad * 2,
+        thickness,
+        icon_color,
+    );
+
+    // --- Minimize (—) ---
+    canvas.draw_line(
+        min_x + pad,
+        top + btn_size / 2,
+        min_x + btn_size - pad,
+        top + btn_size / 2,
+        thickness,
+        icon_color,
+    );
 }
