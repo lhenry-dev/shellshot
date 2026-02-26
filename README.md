@@ -67,16 +67,22 @@ shellshot -o out.png ping -c 5 localhost
 
 ![ping example](docs/ping_example.png)
 
+### ASCII Art Demo
+
+Demonstrating ShellShot’s full support for ANSI colors and text styles:
+
+![ascii example](docs/ascii_example.png)
+
 ### Command Options
 
 #### `--shell` — Force execution inside a shell
 
-The `--shell` flag forces Shellshot to execute the command **inside a shell** instead of running it directly.
+The `--shell` flag forces Shellshot to execute the command **inside a shell** instead of running it directly. This allows you to pass your command as a **single string**, enabling more complex shell operations like pipes, redirections, or command chaining.
 
 **Why this is needed:**
 
 - **Linux/macOS**: Forces execution inside `sh`. Most commands are either executables or shell builtins, so they usually run correctly without `--shell`. Use it if you want consistent shell behavior (e.g., for complex scripts or shell operators like pipes and redirects).
-- **Windows**: Forces execution inside Bash. Many common commands like `echo` or `dir` are **shell builtins**, not standalone executables. Using `--shell` ensures these commands run correctly.
+- **Windows**: Forces execution inside `Bash`. Many common commands like `echo` or `dir` are **shell builtins**, not standalone executables. Using `--shell` ensures these commands run correctly and supports more complex command strings.
 
 **Example:**
 

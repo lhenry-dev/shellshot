@@ -2,14 +2,19 @@ use crate::{
     image_renderer::{
         ImageRendererError,
         render_size::{Size, calculate_char_size},
-        utils::resolve_rgba_with_palette,
+        utils::{
+            resolve_background_color, resolve_foreground_color, resolve_rgba_with_palette,
+            select_font,
+        },
     },
     window_decoration::Fonts,
 };
+use ab_glyph::Font;
 use ab_glyph::PxScale;
+use ab_glyph::ScaleFont;
 use image::{Rgba, RgbaImage};
 use imageproc::drawing::draw_text_mut;
-use termwiz::cell::{CellAttributes, Intensity, Underline};
+use termwiz::cell::{CellAttributes, Underline};
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Rect, Transform};
 use tracing::warn;
 
@@ -25,8 +30,8 @@ bitflags::bitflags! {
 
 #[derive(Debug)]
 pub struct Canvas {
-    pixmap: Pixmap,
-    image_for_text: RgbaImage,
+    background: Pixmap,
+    text_layer: RgbaImage,
     font: Fonts,
     scale: PxScale,
     char_size: Size,
@@ -39,13 +44,13 @@ impl Canvas {
         font: Fonts,
         scale: PxScale,
     ) -> Result<Self, ImageRendererError> {
-        let pixmap = Pixmap::new(width, height).ok_or(ImageRendererError::CanvasInitFailed)?;
-        let image_for_text = RgbaImage::new(width, height);
+        let background = Pixmap::new(width, height).ok_or(ImageRendererError::CanvasInitFailed)?;
+        let text_layer = RgbaImage::new(width, height);
         let char_size = calculate_char_size(&font.regular, scale);
 
         Ok(Self {
-            pixmap,
-            image_for_text,
+            background,
+            text_layer,
             font,
             scale,
             char_size,
@@ -53,7 +58,7 @@ impl Canvas {
     }
 
     pub fn fill(&mut self, color: Rgba<u8>) {
-        self.pixmap
+        self.background
             .fill(Color::from_rgba8(color[0], color[1], color[2], color[3]));
     }
 
@@ -61,8 +66,8 @@ impl Canvas {
         self.fill_rounded_rect(
             0,
             0,
-            self.pixmap.width(),
-            self.pixmap.height(),
+            self.background.width(),
+            self.background.height(),
             color,
             radius,
             corners,
@@ -73,7 +78,7 @@ impl Canvas {
         if let Some(rect) = Rect::from_xywh(x as f32, y as f32, width as f32, height as f32) {
             let mut paint = Paint::default();
             paint.set_color(Color::from_rgba8(color[0], color[1], color[2], color[3]));
-            self.pixmap
+            self.background
                 .fill_rect(rect, &paint, Transform::identity(), None);
         }
     }
@@ -138,7 +143,7 @@ impl Canvas {
         let mut paint = Paint::default();
         paint.set_color(Color::from_rgba8(color[0], color[1], color[2], color[3]));
 
-        self.pixmap.fill_path(
+        self.background.fill_path(
             &path,
             &paint,
             FillRule::Winding,
@@ -152,7 +157,7 @@ impl Canvas {
             let mut paint = Paint::default();
             paint.set_color(Color::from_rgba8(color[0], color[1], color[2], color[3]));
 
-            self.pixmap.fill_path(
+            self.background.fill_path(
                 &path,
                 &paint,
                 tiny_skia::FillRule::Winding,
@@ -170,28 +175,12 @@ impl Canvas {
         color_palette: &[Rgba<u8>; 256],
         attributes: &CellAttributes,
     ) {
-        let foreground_color = if attributes.reverse() {
-            color_palette[0]
-        } else {
-            resolve_rgba_with_palette(color_palette, attributes.foreground())
-                .unwrap_or(color_palette[7])
-        };
-
-        let is_bold = matches!(attributes.intensity(), Intensity::Bold);
-
-        let font = if is_bold && attributes.italic() {
-            &self.font.bold_italic
-        } else if is_bold {
-            &self.font.bold
-        } else if attributes.italic() {
-            &self.font.italic
-        } else {
-            &self.font.regular
-        };
+        let fg_color = resolve_foreground_color(attributes, color_palette);
+        let font = select_font(&self.font, attributes);
 
         draw_text_mut(
-            &mut self.image_for_text,
-            foreground_color,
+            &mut self.text_layer,
+            fg_color,
             x,
             y,
             self.scale,
@@ -199,63 +188,50 @@ impl Canvas {
             text,
         );
 
-        self.draw_cell_attributes(text, x, y, color_palette, attributes);
+        self.draw_cell_attributes(text, x, y, &font, fg_color, color_palette, attributes);
     }
 
+    #[expect(clippy::too_many_arguments)]
     pub fn draw_cell_attributes(
         &mut self,
         text: &str,
         x: i32,
         y: i32,
+        font: &impl Font,
+        fg_color: Rgba<u8>,
         color_palette: &[Rgba<u8>; 256],
         attributes: &CellAttributes,
     ) {
-        let bg_color = if attributes.reverse() {
-            resolve_rgba_with_palette(color_palette, attributes.foreground())
-                .or(Some(color_palette[7]))
-        } else {
-            resolve_rgba_with_palette(color_palette, attributes.background())
-        };
-        if let Some(bg_color) = bg_color {
-            self.fill_rect(
-                x,
-                y,
-                text.chars().count() as u32 * self.char_width(),
-                self.char_height(),
-                bg_color,
-            );
+        let width = text.chars().count() as u32 * self.char_width();
+        if let Some(bg_color) = resolve_background_color(attributes, color_palette) {
+            self.fill_rect(x, y, width, self.char_height(), bg_color);
         }
 
+        let scaled_font = font.as_scaled(self.scale);
+        let baseline = y as f32 + scaled_font.ascent();
+        let thickness = (self.scale.y * 0.07).max(1.0) as u32;
+
+        let underline_color =
+            resolve_rgba_with_palette(color_palette, attributes.underline_color())
+                .unwrap_or(fg_color);
+
         if attributes.underline() != Underline::None {
-            let underline_color =
-                resolve_rgba_with_palette(color_palette, attributes.underline_color())
-                    .unwrap_or(color_palette[7]);
-            self.fill_rect(
-                x,
-                y + self.char_height() as i32,
-                text.chars().count() as u32 * self.char_width(),
-                1,
-                underline_color,
-            );
+            let underline_y = baseline + scaled_font.descent().abs() * 0.3;
+            self.fill_rect(x, underline_y as i32, width, thickness, underline_color);
         }
 
         if attributes.strikethrough() {
-            self.fill_rect(
-                x,
-                y + (self.char_height() as i32 / 2),
-                text.chars().count() as u32 * self.char_width(),
-                1,
-                color_palette[7],
-            );
+            let strike_y = baseline - (scaled_font.ascent() - scaled_font.descent().abs()) * 0.5;
+            self.fill_rect(x, strike_y as i32, width, thickness, underline_color);
         }
     }
 
     pub fn width(&self) -> u32 {
-        self.pixmap.width()
+        self.background.width()
     }
 
     pub fn height(&self) -> u32 {
-        self.pixmap.height()
+        self.background.height()
     }
 
     pub fn char_width(&self) -> u32 {
@@ -268,14 +244,13 @@ impl Canvas {
 
     pub fn to_final_image(&self) -> Result<RgbaImage, ImageRendererError> {
         let mut final_image = RgbaImage::from_raw(
-            self.pixmap.width(),
-            self.pixmap.height(),
-            self.pixmap.data().to_vec(),
+            self.background.width(),
+            self.background.height(),
+            self.background.data().to_vec(),
         )
         .ok_or(ImageRendererError::ImageCreationFailed)?;
 
-        for (final_pixel, text_pixel) in final_image.pixels_mut().zip(self.image_for_text.pixels())
-        {
+        for (final_pixel, text_pixel) in final_image.pixels_mut().zip(self.text_layer.pixels()) {
             let alpha = text_pixel[3] as f32 / 255.0;
             if alpha > 0.0 {
                 for i in 0..3 {
