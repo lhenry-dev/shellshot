@@ -1,13 +1,10 @@
-use std::{io::Cursor, path::Path};
+use std::path::Path;
 
 use image::Rgba;
 use reqwest::Url;
 use thiserror::Error;
 
-use crate::theme::{
-    base16::{Base16, Base16Error},
-    iterm2::{ITerm2, ITermError},
-};
+use crate::theme::{base16::Base16Error, iterm2::ITermError};
 use reqwest::blocking::get;
 
 mod base16;
@@ -76,6 +73,16 @@ impl Default for Theme {
     }
 }
 
+type LoaderFn = fn(&[u8]) -> Result<Theme, ThemeError>;
+
+fn loader_from_extension(ext: &str) -> Result<LoaderFn, ThemeError> {
+    match ext {
+        "yaml" | "yml" => Ok(|b| Ok(base16::Base16::load_bytes(b)?)),
+        "itermcolors" => Ok(|b| Ok(iterm2::ITerm2::load_bytes(b)?)),
+        _ => Err(ThemeError::UnsupportedExtension(ext.into())),
+    }
+}
+
 impl Theme {
     pub fn load<S: AsRef<str>>(source: S) -> Result<Self, ThemeError> {
         let source = source.as_ref();
@@ -91,17 +98,17 @@ impl Theme {
 
     pub fn load_from_path<P: AsRef<Path>>(path: P) -> Result<Self, ThemeError> {
         let path = path.as_ref();
+        let bytes = std::fs::read(path)?;
 
         let extension = path
             .extension()
             .and_then(|ext| ext.to_str())
-            .ok_or(ThemeError::UnknownFormat)?;
+            .ok_or(ThemeError::UnknownFormat)?
+            .to_ascii_lowercase();
 
-        match extension.to_ascii_lowercase().as_str() {
-            "yaml" | "yml" => Ok(Base16::load_file(path)?),
-            "itermcolors" => Ok(ITerm2::load_file(path)?),
-            _ => Err(ThemeError::UnsupportedExtension(extension.into())),
-        }
+        let loader = loader_from_extension(&extension)?;
+
+        loader(&bytes)
     }
 
     pub fn load_from_url(url: &str) -> Result<Self, ThemeError> {
@@ -111,19 +118,12 @@ impl Theme {
         let extension = Path::new(url)
             .extension()
             .and_then(|ext| ext.to_str())
-            .ok_or(ThemeError::UnknownFormat)?;
+            .ok_or(ThemeError::UnknownFormat)?
+            .to_ascii_lowercase();
 
-        match extension.to_ascii_lowercase().as_str() {
-            "yaml" | "yml" => {
-                let cursor = Cursor::new(bytes);
-                Ok(Base16::load_reader(cursor)?)
-            }
-            "itermcolors" => {
-                let cursor = Cursor::new(bytes);
-                Ok(ITerm2::load_reader(cursor)?)
-            }
-            _ => Err(ThemeError::UnsupportedExtension(extension.into())),
-        }
+        let loader = loader_from_extension(&extension)?;
+
+        loader(&bytes)
     }
 }
 
@@ -166,14 +166,8 @@ pub fn build_256_palette(base16: [Rgba<u8>; 16]) -> [Rgba<u8>; 256] {
 
 #[cfg(test)]
 mod tests {
-    use crate::theme::base16::hex_to_rgba;
-
     use super::*;
     use image::Rgba;
-    use std::io::Cursor;
-
-    const VALID_YAML: &str = include_str!("../assets/tests/base16_test.yaml");
-    const VALID_PLIST: &str = include_str!("../assets/tests/iterm_test.itermcolors");
 
     #[test]
     fn test_default_theme_palette() {
@@ -196,21 +190,6 @@ mod tests {
             let val = 8 + (idx as u8) * 10;
             assert_eq!(*color, Rgba([val, val, val, 255]));
         });
-    }
-
-    #[test]
-    fn test_load_from_path_base16() {
-        let cursor = Cursor::new(VALID_YAML);
-        let theme = Base16::load_reader(cursor).expect("Base16 load_reader failed");
-        assert_eq!(theme.foreground_color, hex_to_rgba("#c5c8c6").unwrap());
-    }
-
-    #[test]
-    fn test_load_from_path_iterm() {
-        let cursor = Cursor::new(VALID_PLIST);
-        let theme = ITerm2::load_reader(cursor).expect("ITerm2 load_reader failed");
-        assert_eq!(theme.foreground_color, Rgba([230, 204, 179, 255]));
-        assert_eq!(theme.background_color, Rgba([26, 51, 77, 255]));
     }
 
     #[test]

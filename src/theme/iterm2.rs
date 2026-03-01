@@ -1,7 +1,6 @@
 use image::Rgba;
 use plist::from_bytes;
 use serde::Deserialize;
-use std::{fs, io::Read, path::Path};
 use thiserror::Error;
 
 use crate::theme::{Theme, build_256_palette};
@@ -88,8 +87,8 @@ pub struct ITerm2 {
 }
 
 impl ITerm2 {
-    pub fn parse_str(s: &str) -> Result<Theme, ITermError> {
-        let theme: Self = from_bytes(s.as_bytes())?;
+    pub fn load_bytes(bytes: &[u8]) -> Result<Theme, ITermError> {
+        let theme: Self = from_bytes(bytes)?;
 
         let ansi = [
             theme.ansi_0.into(),
@@ -116,30 +115,17 @@ impl ITerm2 {
             background_color: theme.background.into(),
         })
     }
-
-    pub fn load_file<P: AsRef<Path>>(path: P) -> Result<Theme, ITermError> {
-        let data = fs::read_to_string(path)?;
-
-        Self::parse_str(&data)
-    }
-
-    pub fn load_reader<R: Read>(mut reader: R) -> Result<Theme, ITermError> {
-        let mut content = String::new();
-        reader.read_to_string(&mut content)?;
-        Self::parse_str(&content)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
 
-    const VALID_PLIST: &str = include_str!("../../assets/tests/iterm_test.itermcolors");
+    const VALID_PLIST: &[u8] = include_bytes!("../../assets/tests/iterm_test.itermcolors");
 
     #[test]
     fn test_parse_valid_plist() {
-        let theme = ITerm2::parse_str(VALID_PLIST).expect("Failed to parse valid plist");
+        let theme = ITerm2::load_bytes(VALID_PLIST).expect("Failed to parse valid plist");
         assert_eq!(theme.foreground_color, Rgba([230, 204, 179, 255]));
         assert_eq!(theme.background_color, Rgba([26, 51, 77, 255]));
         assert_eq!(theme.palette.len(), 256);
@@ -147,8 +133,8 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_plist() {
-        let invalid_plist = "<plist>not valid</plist>";
-        let err = ITerm2::parse_str(invalid_plist).unwrap_err();
+        let invalid_plist = "<plist>not valid</plist>".as_bytes();
+        let err = ITerm2::load_bytes(invalid_plist).unwrap_err();
         matches!(err, ITermError::PlistError(_));
     }
 
@@ -161,18 +147,5 @@ mod tests {
         };
         let rgba: Rgba<u8> = color.into();
         assert_eq!(rgba, Rgba([128, 64, 191, 255]));
-    }
-
-    #[test]
-    fn test_load_reader_valid() {
-        let cursor = Cursor::new(VALID_PLIST);
-        let theme = ITerm2::load_reader(cursor).expect("Failed to load reader");
-        assert_eq!(theme.foreground_color, Rgba([230, 204, 179, 255]));
-    }
-
-    #[test]
-    fn test_load_file_nonexistent() {
-        let result = ITerm2::load_file("this_file_should_not_exist.plist");
-        matches!(result.unwrap_err(), ITermError::Io(_));
     }
 }

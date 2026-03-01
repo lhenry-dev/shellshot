@@ -61,12 +61,6 @@ This will execute the command, capture its output, and generate an image file na
 
 ![echo example](docs/echo_example.png)
 
-```bash
-shellshot -o out.png ping -c 5 localhost
-```
-
-![ping example](docs/ping_example.png)
-
 ### ASCII Art Demo
 
 Demonstrating ShellShot’s full support for ANSI colors and text styles:

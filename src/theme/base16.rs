@@ -1,5 +1,3 @@
-use std::{fs, io::Read, path::Path};
-
 use image::Rgba;
 use serde::Deserialize;
 use thiserror::Error;
@@ -46,8 +44,8 @@ pub struct Base16 {
 }
 
 impl Base16 {
-    pub fn parse_str(s: &str) -> Result<Theme, Base16Error> {
-        let theme: Self = serde_yaml::from_str(s)?;
+    pub fn load_bytes(bytes: &[u8]) -> Result<Theme, Base16Error> {
+        let theme: Self = serde_yaml::from_slice(bytes)?;
 
         let ansi: [Rgba<u8>; 16] = [
             hex_to_rgba(&theme.base00)?, // 0
@@ -68,28 +66,11 @@ impl Base16 {
             hex_to_rgba(&theme.base07)?, // 15
         ];
 
-        let palette = build_256_palette(ansi);
-
-        let foreground = hex_to_rgba(&theme.base05)?;
-        let background = hex_to_rgba(&theme.base00)?;
-
         Ok(Theme {
-            palette,
-            foreground_color: foreground,
-            background_color: background,
+            palette: build_256_palette(ansi),
+            foreground_color: hex_to_rgba(&theme.base05)?,
+            background_color: hex_to_rgba(&theme.base00)?,
         })
-    }
-
-    pub fn load_file<P: AsRef<Path>>(path: P) -> Result<Theme, Base16Error> {
-        let data = fs::read_to_string(path)?;
-
-        Self::parse_str(&data)
-    }
-
-    pub fn load_reader<R: Read>(mut reader: R) -> Result<Theme, Base16Error> {
-        let mut content = String::new();
-        reader.read_to_string(&mut content)?;
-        Self::parse_str(&content)
     }
 }
 
@@ -123,13 +104,12 @@ fn parse_hex_byte(hex: &str) -> Result<u8, Base16Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
 
-    const VALID_YAML: &str = include_str!("../../assets/tests/base16_test.yaml");
+    const VALID_YAML: &[u8] = include_bytes!("../../assets/tests/base16_test.yaml");
 
     #[test]
     fn test_parse_valid_yaml() {
-        let theme = Base16::parse_str(VALID_YAML).expect("Failed to parse valid YAML");
+        let theme = Base16::load_bytes(VALID_YAML).expect("Failed to parse valid YAML");
         assert_eq!(theme.foreground_color, hex_to_rgba("#c5c8c6").unwrap());
         assert_eq!(theme.background_color, hex_to_rgba("#1d1f21").unwrap());
         assert_eq!(theme.palette.len(), 256);
@@ -137,8 +117,8 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_yaml() {
-        let invalid_yaml = "not: valid: yaml";
-        let err = Base16::parse_str(invalid_yaml).unwrap_err();
+        let invalid_yaml = "not: valid: yaml".as_bytes();
+        let err = Base16::load_bytes(invalid_yaml).unwrap_err();
         matches!(err, Base16Error::YamlError(_));
     }
 
@@ -164,18 +144,5 @@ mod tests {
     fn test_hex_to_rgba_invalid_hex() {
         let err = hex_to_rgba("#zz2233").unwrap_err();
         matches!(err, Base16Error::ParseError { .. });
-    }
-
-    #[test]
-    fn test_load_reader_valid() {
-        let cursor = Cursor::new(VALID_YAML);
-        let theme = Base16::load_reader(cursor).expect("Failed to load reader");
-        assert_eq!(theme.foreground_color, hex_to_rgba("#c5c8c6").unwrap());
-    }
-
-    #[test]
-    fn test_load_file_nonexistent() {
-        let result = Base16::load_file("this_file_should_not_exist.yml");
-        matches!(result.unwrap_err(), Base16Error::Io(_));
     }
 }
