@@ -118,25 +118,3 @@ jobs:
         run: cargo install cargo-msrv
       - name: Verify Minimum Supported Rust Version
         run: cargo msrv verify
-
-  screenshots:
-    name: Verify documentation screenshots
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-      - name: Generate documentation images
-        run: |
-          alias python=python3
-          python scripts/regenerate_docs_images.py
-      - name: Check for uncommitted changes
-        run: |
-          git diff --exit-code || (
-            echo "Documentation images are not up to date."
-            echo "Run: python scripts/regenerate_docs_images.py"
-            exit 1
-          )

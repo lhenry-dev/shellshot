@@ -11,7 +11,6 @@ SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 
 IS_WINDOWS = platform.system() == "Windows"
 
-
 def run_shellshot(output_name, command, use_shell=False):
     output_path = DOCS_DIR / output_name
 
