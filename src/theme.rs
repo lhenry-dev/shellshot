@@ -115,11 +115,15 @@ impl Theme {
         let resp = get(url)?;
         let bytes = resp.bytes()?;
 
-        let extension = Path::new(url)
-            .extension()
-            .and_then(|ext| ext.to_str())
-            .ok_or(ThemeError::UnknownFormat)?
-            .to_ascii_lowercase();
+        let extension = Url::parse(url)
+            .ok()
+            .and_then(|u| {
+                Path::new(u.path())
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .map(|s| s.to_ascii_lowercase())
+            })
+            .ok_or(ThemeError::UnknownFormat)?;
 
         let loader = loader_from_extension(&extension)?;
 
@@ -190,6 +194,37 @@ mod tests {
             let val = 8 + (idx as u8) * 10;
             assert_eq!(*color, Rgba([val, val, val, 255]));
         });
+    }
+
+    #[test]
+    fn test_load_from_path_valid() {
+        let path = "assets/tests/base16_test.yaml";
+
+        let theme = Theme::load_from_path(path).expect("should load theme");
+
+        assert_eq!(theme.palette.len(), 256);
+    }
+
+    #[test]
+    fn test_load_from_url_valid() {
+        let mut server = mockito::Server::new();
+
+        let yaml = include_str!("../assets/tests/base16_test.yaml");
+
+        let mock = server
+            .mock("GET", "/theme.yaml")
+            .with_status(200)
+            .with_header("content-type", "text/plain")
+            .with_body(yaml)
+            .create();
+
+        let url = format!("{}/theme.yaml", server.url());
+
+        let theme = Theme::load_from_url(&url).unwrap();
+
+        assert_eq!(theme.palette.len(), 256);
+
+        mock.assert();
     }
 
     #[test]
