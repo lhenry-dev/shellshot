@@ -8,11 +8,12 @@ use unicode_width::UnicodeWidthChar;
 use crate::constants::{FONT_SIZE, IMAGE_QUALITY_MULTIPLIER};
 use crate::image_renderer::canvas::Canvas;
 use crate::image_renderer::render_size::{calculate_char_size, calculate_image_size};
+use crate::theme::Theme;
 use crate::window_decoration::{WindowDecoration, WindowMetrics};
 
 pub mod canvas;
 pub mod render_size;
-mod utils;
+pub mod utils;
 
 #[derive(Debug, Error)]
 pub enum ImageRendererError {
@@ -36,6 +37,7 @@ pub struct ImageRenderer {
     canvas: Canvas,
     metrics: WindowMetrics,
     window_decoration: Box<dyn WindowDecoration>,
+    theme: Theme,
 }
 
 impl ImageRenderer {
@@ -60,8 +62,9 @@ impl ImageRenderer {
         command: &[String],
         screen: &Surface,
         window_decoration: Box<dyn WindowDecoration>,
+        theme: Theme,
     ) -> Result<RgbaImage, ImageRendererError> {
-        let mut renderer = Self::create_renderer(command, screen, window_decoration)?;
+        let mut renderer = Self::create_renderer(command, screen, window_decoration, theme)?;
         renderer.compose_image(command, screen)
     }
 
@@ -69,6 +72,7 @@ impl ImageRenderer {
         command: &[String],
         screen: &Surface,
         window_decoration: Box<dyn WindowDecoration>,
+        theme: Theme,
     ) -> Result<Self, ImageRendererError> {
         let font = window_decoration.font()?;
 
@@ -78,12 +82,13 @@ impl ImageRenderer {
 
         let metrics = window_decoration.compute_metrics(char_size);
         let image_size = calculate_image_size(&command_line, screen, &metrics, char_size);
-        let canvas = Canvas::new(image_size.width, image_size.height, font.clone(), scale)?;
+        let canvas = Canvas::new(image_size.width, image_size.height, font, scale)?;
 
         Ok(Self {
             canvas,
             metrics,
             window_decoration,
+            theme,
         })
     }
 
@@ -93,7 +98,7 @@ impl ImageRenderer {
         screen: &Surface,
     ) -> Result<RgbaImage, ImageRendererError> {
         self.window_decoration
-            .draw_window(&mut self.canvas, &self.metrics)?;
+            .draw_window(&mut self.canvas, &self.metrics, &self.theme)?;
 
         self.draw_command_line(command)?;
 
@@ -111,8 +116,6 @@ impl ImageRenderer {
         let start_y =
             self.metrics.border_width + self.metrics.title_bar_height + self.metrics.padding;
 
-        let color_palette = self.window_decoration.get_color_palette();
-
         let command_line = self
             .window_decoration
             .build_command_line(&command.join(" "));
@@ -124,8 +127,7 @@ impl ImageRenderer {
 
             let text = cell.str();
 
-            self.canvas
-                .draw_text(text, x, y, &color_palette, cell.attrs());
+            self.canvas.draw_text(text, x, y, &self.theme, cell.attrs());
 
             let text_width = text
                 .chars()
@@ -142,8 +144,6 @@ impl ImageRenderer {
         let start_y =
             self.metrics.border_width + self.metrics.title_bar_height + self.metrics.padding;
 
-        let color_palette = self.window_decoration.get_color_palette();
-
         for (row_idx, line) in screen.screen_lines().iter().enumerate() {
             let row_idx = u32::try_from(row_idx + 1)?;
             let y = i32::try_from(start_y + row_idx * self.canvas.char_height())?;
@@ -154,8 +154,7 @@ impl ImageRenderer {
 
                 let text = cell.str();
 
-                self.canvas
-                    .draw_text(text, x, y, &color_palette, cell.attrs());
+                self.canvas.draw_text(text, x, y, &self.theme, cell.attrs());
 
                 let text_width = text
                     .chars()
@@ -188,10 +187,11 @@ mod tests {
         let window_decoration = create_window_decoration(None);
 
         let surface = create_mock_surface();
+        let theme = Theme::default();
 
         let command = vec!["echo".to_string(), "test".to_string()];
 
-        let result = ImageRenderer::render_image(&command, &surface, window_decoration);
+        let result = ImageRenderer::render_image(&command, &surface, window_decoration, theme);
 
         assert!(result.is_ok(), "ImageRenderer failed to render mock screen");
 

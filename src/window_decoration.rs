@@ -1,23 +1,26 @@
 use crate::{
     image_renderer::{ImageRendererError, canvas::Canvas, render_size::Size},
-    window_decoration::no_decoration::NoDecoration,
+    theme::Theme,
+    window_decoration::{no_decoration::NoDecoration, windows::Windows},
 };
+use ab_glyph::FontArc;
+use clap::ValueEnum;
+use termwiz::cell::Cell;
 
 mod classic;
 pub mod common;
 mod no_decoration;
+mod windows;
 
-use ab_glyph::FontArc;
-use clap::ValueEnum;
 pub use classic::Classic;
-use image::Rgba;
-use termwiz::cell::Cell;
 
 /// Type of window decoration to apply around the rendered content
 #[derive(Clone, Debug, ValueEnum)]
 pub enum WindowDecorationType {
     /// Classic window decoration
     Classic,
+    /// Windows-style window decoration
+    Windows,
 }
 
 #[derive(Clone, Debug)]
@@ -40,14 +43,13 @@ pub trait WindowDecoration: std::fmt::Debug {
 
     fn compute_metrics(&self, char_size: Size) -> WindowMetrics;
 
-    fn get_color_palette(&self) -> [Rgba<u8>; 256];
-
     fn font(&self) -> Result<Fonts, ImageRendererError>;
 
     fn draw_window(
         &self,
         canvas: &mut Canvas,
         metrics: &WindowMetrics,
+        theme: &Theme,
     ) -> Result<(), ImageRendererError>;
 }
 
@@ -56,6 +58,7 @@ pub fn create_window_decoration(
 ) -> Box<dyn WindowDecoration> {
     match decoration_type {
         Some(WindowDecorationType::Classic) => Box::new(Classic),
+        Some(WindowDecorationType::Windows) => Box::new(Windows),
         None => Box::new(NoDecoration),
     }
 }
@@ -92,23 +95,11 @@ mod tests {
     }
 
     #[test]
-    fn test_all_window_decorations_colors() {
-        for decoration_type in all_window_decorations() {
-            let window_decoration = create_window_decoration(decoration_type.as_ref());
-
-            let fg = window_decoration.get_color_palette()[7];
-            assert!(fg.0[3] > 0, "Alpha channel must be > 0");
-
-            let palette = window_decoration.get_color_palette();
-            assert_eq!(palette.len(), 256, "Palette must have 256 colors");
-        }
-    }
-
-    #[test]
     fn test_all_window_decorations_draw() {
         let canvas_width = 200;
         let canvas_height = 100;
         let scale = PxScale::from(1.0);
+        let theme = Theme::default();
 
         for decoration_type in all_window_decorations() {
             let window_decoration = create_window_decoration(decoration_type.as_ref());
@@ -121,7 +112,7 @@ mod tests {
             let mut canvas = Canvas::new(canvas_width, canvas_height, font.clone(), scale)
                 .expect("Failed to create Canvas");
 
-            let result = window_decoration.draw_window(&mut canvas, &metrics);
+            let result = window_decoration.draw_window(&mut canvas, &metrics, &theme);
             assert!(
                 result.is_ok(),
                 "draw_window failed for {decoration_type:?}: {result:?}",
