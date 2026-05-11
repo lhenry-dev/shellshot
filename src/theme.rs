@@ -87,10 +87,10 @@ impl Theme {
     pub fn load<S: AsRef<str>>(source: S) -> Result<Self, ThemeError> {
         let source = source.as_ref();
 
-        if let Ok(url) = Url::parse(source) {
-            if url.scheme() == "http" || url.scheme() == "https" {
-                return Self::load_from_url(source);
-            }
+        if let Ok(url) = Url::parse(source)
+            && (url.scheme() == "http" || url.scheme() == "https")
+        {
+            return Self::load_from_url(source);
         }
 
         Self::load_from_path(source)
