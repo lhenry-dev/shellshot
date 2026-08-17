@@ -3,7 +3,7 @@
 <h1>Shellshot</h1>
 
 [![Crates.io](https://img.shields.io/crates/v/shellshot)](https://crates.io/crates/shellshot)
-[![Build Status](https://img.shields.io/github/actions/workflow/status/lhenry-dev/shellshot/ci.yml?branch=main)](https://github.com/lhenry-dev/shellshot/actions/workflows/ci.yml?branch=main)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/lhenry-dev/shellshot/build.yml?branch=main)](https://github.com/lhenry-dev/shellshot/actions/workflows/build.yml?branch=main)
 [![Dependency Status](https://deps.rs/repo/github/lhenry-dev/shellshot/status.svg)](https://deps.rs/repo/github/lhenry-dev/shellshot)
 [![Documentation](https://docs.rs/shellshot/badge.svg)](https://docs.rs/shellshot)
 [![License](https://img.shields.io/crates/l/shellshot)](https://crates.io/crates/shellshot)
